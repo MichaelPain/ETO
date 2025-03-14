@@ -432,4 +432,307 @@ class ETO_Double_Elimination {
             }
         }
         
-        // Se non trovato<response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>
+        // Se non trovato nei bracket principali, controlla la finale
+        if (!$match_found && $bracket['final_match']['id'] === $match_id) {
+            $bracket['final_match']['winner_id'] = $winner_id;
+            $bracket['final_match']['loser_id'] = $loser_id;
+            $bracket['final_match']['status'] = 'completed';
+            
+            $next_match_id = $bracket['final_match']['next_match_id'];
+            $match_found = true;
+        }
+        
+        // Se non trovato nella finale, controlla la grand finale
+        if (!$match_found && $bracket['grand_final_match']['id'] === $match_id) {
+            $bracket['grand_final_match']['winner_id'] = $winner_id;
+            $bracket['grand_final_match']['loser_id'] = $loser_id;
+            $bracket['grand_final_match']['status'] = 'completed';
+            
+            $match_found = true;
+        }
+        
+        if (!$match_found) {
+            return false;
+        }
+        
+        // Aggiorna il prossimo match nel winner bracket
+        if ($next_match_id) {
+            $this->update_next_match($bracket, $next_match_id, $winner_id);
+        }
+        
+        // Aggiorna il prossimo match nel loser bracket
+        if ($next_loser_match_id) {
+            $this->update_next_loser_match($bracket, $next_loser_match_id, $loser_id);
+        }
+        
+        // Salva il bracket aggiornato
+        $result = $wpdb->update(
+            $table_brackets,
+            [
+                'data' => json_encode($bracket),
+                'updated_at' => current_time('mysql')
+            ],
+            [
+                'tournament_id' => $tournament_id,
+                'bracket_type' => 'double_elimination'
+            ]
+        );
+        
+        return $result !== false;
+    }
+
+    /**
+     * Aggiorna il prossimo match con il vincitore
+     *
+     * @param array $bracket Struttura del bracket
+     * @param string $next_match_id ID del prossimo match
+     * @param int $winner_id ID del team vincitore
+     */
+    private function update_next_match(&$bracket, $next_match_id, $winner_id) {
+        // Cerca nel winner bracket
+        foreach ($bracket['winner_bracket'] as $round_index => $round) {
+            foreach ($round as $match_index => $match) {
+                if ($match['id'] === $next_match_id) {
+                    // Aggiorna il team nel prossimo match
+                    if ($match['team1_id'] === null) {
+                        $bracket['winner_bracket'][$round_index][$match_index]['team1_id'] = $winner_id;
+                    } else {
+                        $bracket['winner_bracket'][$round_index][$match_index]['team2_id'] = $winner_id;
+                    }
+                    return;
+                }
+            }
+        }
+        
+        // Cerca nel loser bracket
+        foreach ($bracket['loser_bracket'] as $round_index => $round) {
+            foreach ($round as $match_index => $match) {
+                if ($match['id'] === $next_match_id) {
+                    // Aggiorna il team nel prossimo match
+                    if ($match['team1_id'] === null) {
+                        $bracket['loser_bracket'][$round_index][$match_index]['team1_id'] = $winner_id;
+                    } else {
+                        $bracket['loser_bracket'][$round_index][$match_index]['team2_id'] = $winner_id;
+                    }
+                    return;
+                }
+            }
+        }
+        
+        // Controlla se è la finale
+        if ($next_match_id === 'F_M1') {
+            if ($bracket['final_match']['team1_id'] === null) {
+                $bracket['final_match']['team1_id'] = $winner_id;
+            } else {
+                $bracket['final_match']['team2_id'] = $winner_id;
+            }
+            return;
+        }
+        
+        // Controlla se è la grand finale
+        if ($next_match_id === 'GF_M1') {
+            if ($bracket['grand_final_match']['team1_id'] === null) {
+                $bracket['grand_final_match']['team1_id'] = $winner_id;
+            } else {
+                $bracket['grand_final_match']['team2_id'] = $winner_id;
+            }
+            return;
+        }
+    }
+
+    /**
+     * Aggiorna il prossimo match nel loser bracket con il perdente
+     *
+     * @param array $bracket Struttura del bracket
+     * @param string $next_loser_match_id ID del prossimo match nel loser bracket
+     * @param int $loser_id ID del team perdente
+     */
+    private function update_next_loser_match(&$bracket, $next_loser_match_id, $loser_id) {
+        // Cerca nel loser bracket
+        foreach ($bracket['loser_bracket'] as $round_index => $round) {
+            foreach ($round as $match_index => $match) {
+                if ($match['id'] === $next_loser_match_id) {
+                    // Aggiorna il team nel prossimo match
+                    if ($match['team1_id'] === null) {
+                        $bracket['loser_bracket'][$round_index][$match_index]['team1_id'] = $loser_id;
+                    } else {
+                        $bracket['loser_bracket'][$round_index][$match_index]['team2_id'] = $loser_id;
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Ottiene il bracket di un torneo
+     *
+     * @param int $tournament_id ID del torneo
+     * @return array|false Bracket o false se non trovato
+     */
+    public function get_bracket($tournament_id) {
+        global $wpdb;
+        
+        $table_brackets = $wpdb->prefix . 'eto_brackets';
+        
+        $bracket_data = $wpdb->get_var($wpdb->prepare(
+            "SELECT data FROM $table_brackets WHERE tournament_id = %d AND bracket_type = 'double_elimination'",
+            $tournament_id
+        ));
+        
+        if (!$bracket_data) {
+            return false;
+        }
+        
+        return json_decode($bracket_data, true);
+    }
+
+    /**
+     * Ottiene i match di un torneo a doppia eliminazione
+     *
+     * @param int $tournament_id ID del torneo
+     * @return array Array di match
+     */
+    public function get_matches($tournament_id) {
+        $bracket = $this->get_bracket($tournament_id);
+        
+        if (!$bracket) {
+            return [];
+        }
+        
+        $matches = [];
+        
+        // Aggiungi i match del winner bracket
+        foreach ($bracket['winner_bracket'] as $round) {
+            foreach ($round as $match) {
+                $matches[] = $match;
+            }
+        }
+        
+        // Aggiungi i match del loser bracket
+        foreach ($bracket['loser_bracket'] as $round) {
+            foreach ($round as $match) {
+                $matches[] = $match;
+            }
+        }
+        
+        // Aggiungi la finale
+        $matches[] = $bracket['final_match'];
+        
+        // Aggiungi la grand finale
+        $matches[] = $bracket['grand_final_match'];
+        
+        return $matches;
+    }
+
+    /**
+     * Ottiene i match pendenti di un torneo a doppia eliminazione
+     *
+     * @param int $tournament_id ID del torneo
+     * @return array Array di match pendenti
+     */
+    public function get_pending_matches($tournament_id) {
+        $matches = $this->get_matches($tournament_id);
+        
+        return array_filter($matches, function($match) {
+            return $match['status'] === 'pending' && $match['team1_id'] !== null && $match['team2_id'] !== null;
+        });
+    }
+
+    /**
+     * Ottiene i match completati di un torneo a doppia eliminazione
+     *
+     * @param int $tournament_id ID del torneo
+     * @return array Array di match completati
+     */
+    public function get_completed_matches($tournament_id) {
+        $matches = $this->get_matches($tournament_id);
+        
+        return array_filter($matches, function($match) {
+            return $match['status'] === 'completed';
+        });
+    }
+
+    /**
+     * Ottiene il vincitore di un torneo a doppia eliminazione
+     *
+     * @param int $tournament_id ID del torneo
+     * @return int|false ID del team vincitore o false se il torneo non è completato
+     */
+    public function get_winner($tournament_id) {
+        $bracket = $this->get_bracket($tournament_id);
+        
+        if (!$bracket) {
+            return false;
+        }
+        
+        // Se la grand finale è completata, il vincitore è il vincitore della grand finale
+        if ($bracket['grand_final_match']['status'] === 'completed') {
+            return $bracket['grand_final_match']['winner_id'];
+        }
+        
+        return false;
+    }
+
+    /**
+     * Verifica se un torneo a doppia eliminazione è completato
+     *
+     * @param int $tournament_id ID del torneo
+     * @return bool True se il torneo è completato, false altrimenti
+     */
+    public function is_tournament_completed($tournament_id) {
+        $bracket = $this->get_bracket($tournament_id);
+        
+        if (!$bracket) {
+            return false;
+        }
+        
+        // Il torneo è completato se la grand finale è completata
+        return $bracket['grand_final_match']['status'] === 'completed';
+    }
+
+    /**
+     * Ottiene il round corrente di un torneo a doppia eliminazione
+     *
+     * @param int $tournament_id ID del torneo
+     * @return string|false Round corrente o false se il torneo non è trovato
+     */
+    public function get_current_round($tournament_id) {
+        $bracket = $this->get_bracket($tournament_id);
+        
+        if (!$bracket) {
+            return false;
+        }
+        
+        // Controlla se ci sono match pendenti nel winner bracket
+        foreach ($bracket['winner_bracket'] as $round_index => $round) {
+            foreach ($round as $match) {
+                if ($match['status'] === 'pending' && $match['team1_id'] !== null && $match['team2_id'] !== null) {
+                    return 'W_R' . ($round_index + 1);
+                }
+            }
+        }
+        
+        // Controlla se ci sono match pendenti nel loser bracket
+        foreach ($bracket['loser_bracket'] as $round_index => $round) {
+            foreach ($round as $match) {
+                if ($match['status'] === 'pending' && $match['team1_id'] !== null && $match['team2_id'] !== null) {
+                    return 'L_R' . ($round_index + 1);
+                }
+            }
+        }
+        
+        // Controlla se la finale è pendente
+        if ($bracket['final_match']['status'] === 'pending' && $bracket['final_match']['team1_id'] !== null && $bracket['final_match']['team2_id'] !== null) {
+            return 'F';
+        }
+        
+        // Controlla se la grand finale è pendente
+        if ($bracket['grand_final_match']['status'] === 'pending' && $bracket['grand_final_match']['team1_id'] !== null && $bracket['grand_final_match']['team2_id'] !== null) {
+            return 'GF';
+        }
+        
+        // Se tutti i match sono completati, il torneo è completato
+        return 'completed';
+    }
+}

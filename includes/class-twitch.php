@@ -451,4 +451,621 @@ class ETO_Twitch {
      * Gestisce il contenuto della colonna stream
      *
      * @param string $column Nome della colonna
-     * @param int $post<response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>
+     * @param int $post_id ID del post
+     */
+    public function manage_stream_column($column, $post_id) {
+        if ($column !== 'eto_twitch') {
+            return;
+        }
+        
+        $channel = get_post_meta($post_id, 'eto_twitch_channel', true);
+        
+        if (!$channel) {
+            echo '<span class="eto-twitch-not-set">' . __('Non impostato', 'eto') . '</span>';
+            return;
+        }
+        
+        $stream_info = get_post_meta($post_id, 'eto_twitch_stream_info', true);
+        $is_live = !empty($stream_info) && isset($stream_info['is_live']) && $stream_info['is_live'];
+        
+        if ($is_live) {
+            echo '<span class="eto-twitch-live">' . __('LIVE', 'eto') . '</span> ';
+        } else {
+            echo '<span class="eto-twitch-offline">' . __('Offline', 'eto') . '</span> ';
+        }
+        
+        echo '<a href="https://twitch.tv/' . esc_attr($channel) . '" target="_blank">' . esc_html($channel) . '</a>';
+        
+        if ($is_live && isset($stream_info['viewer_count'])) {
+            echo '<br>';
+            echo '<small>' . sprintf(__('%s spettatori', 'eto'), number_format($stream_info['viewer_count'])) . '</small>';
+        }
+    }
+
+    /**
+     * Aggiunge una meta box per lo stream nella pagina di modifica del match
+     */
+    public function add_stream_meta_box() {
+        add_meta_box(
+            'eto_twitch_meta_box',
+            __('Stream Twitch', 'eto'),
+            [$this, 'render_stream_meta_box'],
+            'eto_match',
+            'side',
+            'default'
+        );
+    }
+
+    /**
+     * Renderizza la meta box per lo stream
+     *
+     * @param WP_Post $post Post corrente
+     */
+    public function render_stream_meta_box($post) {
+        // Ottieni i dati dello stream
+        $channel = get_post_meta($post->ID, 'eto_twitch_channel', true);
+        $stream_info = get_post_meta($post->ID, 'eto_twitch_stream_info', true);
+        $is_live = !empty($stream_info) && isset($stream_info['is_live']) && $stream_info['is_live'];
+        
+        // Aggiungi il nonce
+        wp_nonce_field('eto_twitch_meta_box', 'eto_twitch_meta_box_nonce');
+        
+        // Includi gli script e gli stili necessari
+        wp_enqueue_script('eto-twitch-admin', ETO_PLUGIN_URL . 'admin/js/twitch.js', ['jquery'], ETO_VERSION, true);
+        wp_localize_script('eto-twitch-admin', 'eto_twitch', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('eto_twitch_nonce'),
+            'match_id' => $post->ID,
+            'messages' => [
+                'searching' => __('Ricerca in corso...', 'eto'),
+                'no_results' => __('Nessun risultato trovato.', 'eto'),
+                'error' => __('Si è verificato un errore durante la ricerca.', 'eto')
+            ]
+        ]);
+        
+        // Renderizza il form
+        ?>
+        <p>
+            <label for="eto_twitch_channel"><?php _e('Canale Twitch:', 'eto'); ?></label>
+            <div class="eto-twitch-channel-input">
+                <input type="text" id="eto_twitch_channel" name="eto_twitch_channel" value="<?php echo esc_attr($channel); ?>" class="widefat" />
+                <button type="button" id="eto_twitch_search" class="button"><?php _e('Cerca', 'eto'); ?></button>
+            </div>
+            <div id="eto_twitch_search_results" class="eto-twitch-search-results"></div>
+        </p>
+        
+        <div id="eto_twitch_preview" class="eto-twitch-preview" <?php echo $channel ? '' : 'style="display: none;"'; ?>>
+            <h4><?php _e('Anteprima:', 'eto'); ?></h4>
+            
+            <?php if ($is_live && isset($stream_info['thumbnail_url'])): ?>
+            <div class="eto-twitch-preview-thumbnail">
+                <img src="<?php echo esc_url(str_replace('{width}x{height}', '320x180', $stream_info['thumbnail_url'])); ?>" alt="<?php echo esc_attr($channel); ?>">
+                <span class="eto-twitch-live-badge"><?php _e('LIVE', 'eto'); ?></span>
+            </div>
+            <?php endif; ?>
+            
+            <div class="eto-twitch-preview-info">
+                <p>
+                    <strong><?php _e('Canale:', 'eto'); ?></strong>
+                    <a href="https://twitch.tv/<?php echo esc_attr($channel); ?>" target="_blank"><?php echo esc_html($channel); ?></a>
+                </p>
+                
+                <?php if ($is_live): ?>
+                <p>
+                    <strong><?php _e('Stato:', 'eto'); ?></strong>
+                    <span class="eto-twitch-live"><?php _e('LIVE', 'eto'); ?></span>
+                </p>
+                
+                <?php if (isset($stream_info['title'])): ?>
+                <p>
+                    <strong><?php _e('Titolo:', 'eto'); ?></strong>
+                    <?php echo esc_html($stream_info['title']); ?>
+                </p>
+                <?php endif; ?>
+                
+                <?php if (isset($stream_info['game_name'])): ?>
+                <p>
+                    <strong><?php _e('Gioco:', 'eto'); ?></strong>
+                    <?php echo esc_html($stream_info['game_name']); ?>
+                </p>
+                <?php endif; ?>
+                
+                <?php if (isset($stream_info['viewer_count'])): ?>
+                <p>
+                    <strong><?php _e('Spettatori:', 'eto'); ?></strong>
+                    <?php echo number_format($stream_info['viewer_count']); ?>
+                </p>
+                <?php endif; ?>
+                
+                <?php else: ?>
+                <p>
+                    <strong><?php _e('Stato:', 'eto'); ?></strong>
+                    <span class="eto-twitch-offline"><?php _e('Offline', 'eto'); ?></span>
+                </p>
+                <?php endif; ?>
+                
+                <p>
+                    <button type="button" id="eto_twitch_refresh" class="button"><?php _e('Aggiorna', 'eto'); ?></button>
+                </p>
+            </div>
+        </div>
+        
+        <p>
+            <label for="eto_twitch_shortcode"><?php _e('Shortcode:', 'eto'); ?></label>
+            <input type="text" id="eto_twitch_shortcode" value='[eto_twitch_stream match_id="<?php echo esc_attr($post->ID); ?>"]' readonly class="widefat" onclick="this.select();" />
+        </p>
+        
+        <style>
+        .eto-twitch-channel-input {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .eto-twitch-search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            display: none;
+        }
+        
+        .eto-twitch-search-result {
+            padding: 5px;
+            cursor: pointer;
+        }
+        
+        .eto-twitch-search-result:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .eto-twitch-preview-thumbnail {
+            position: relative;
+            margin-bottom: 10px;
+        }
+        
+        .eto-twitch-preview-thumbnail img {
+            width: 100%;
+            height: auto;
+        }
+        
+        .eto-twitch-live-badge {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background-color: #e91916;
+            color: white;
+            padding: 2px 5px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 3px;
+        }
+        
+        .eto-twitch-live {
+            color: #e91916;
+            font-weight: bold;
+        }
+        
+        .eto-twitch-offline {
+            color: #999;
+        }
+        
+        .eto-twitch-not-set {
+            color: #999;
+            font-style: italic;
+        }
+        </style>
+        <?php
+    }
+
+    /**
+     * Salva i dati della meta box per lo stream
+     *
+     * @param int $post_id ID del post
+     * @param WP_Post $post Post corrente
+     * @param bool $update Se è un aggiornamento
+     */
+    public function save_stream_meta_box($post_id, $post, $update) {
+        // Verifica il nonce
+        if (!isset($_POST['eto_twitch_meta_box_nonce']) || !wp_verify_nonce($_POST['eto_twitch_meta_box_nonce'], 'eto_twitch_meta_box')) {
+            return;
+        }
+        
+        // Verifica se è un salvataggio automatico
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+        
+        // Verifica i permessi
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+        
+        // Salva i dati
+        if (isset($_POST['eto_twitch_channel'])) {
+            $channel = sanitize_text_field($_POST['eto_twitch_channel']);
+            
+            // Rimuovi eventuali URL completi
+            if (strpos($channel, 'twitch.tv/') !== false) {
+                $channel = preg_replace('/.*twitch\.tv\//', '', $channel);
+            }
+            
+            update_post_meta($post_id, 'eto_twitch_channel', $channel);
+            
+            // Aggiorna le informazioni sullo stream
+            if ($channel) {
+                $this->update_stream_info($post_id, $channel);
+            } else {
+                delete_post_meta($post_id, 'eto_twitch_stream_info');
+            }
+        }
+    }
+
+    /**
+     * Gestisce la ricerca di un canale Twitch tramite AJAX
+     */
+    public function ajax_search_channel() {
+        // Verifica il nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'eto_twitch_nonce')) {
+            wp_send_json_error(['message' => __('Errore di sicurezza. Ricarica la pagina e riprova.', 'eto')]);
+        }
+        
+        // Verifica i parametri
+        if (!isset($_POST['query'])) {
+            wp_send_json_error(['message' => __('Parametri mancanti.', 'eto')]);
+        }
+        
+        $query = sanitize_text_field($_POST['query']);
+        
+        // Verifica che la query non sia vuota
+        if (empty($query)) {
+            wp_send_json_error(['message' => __('Inserisci un termine di ricerca.', 'eto')]);
+        }
+        
+        // Verifica che le credenziali siano impostate
+        if (empty($this->client_id) || empty($this->client_secret)) {
+            wp_send_json_error(['message' => __('Credenziali Twitch non configurate. Contatta l\'amministratore.', 'eto')]);
+        }
+        
+        // Ottieni un token di accesso se necessario
+        if (empty($this->access_token)) {
+            $this->refresh_access_token();
+        }
+        
+        // Cerca i canali
+        $channels = $this->search_channels($query);
+        
+        if (is_wp_error($channels)) {
+            wp_send_json_error(['message' => $channels->get_error_message()]);
+        }
+        
+        wp_send_json_success(['channels' => $channels]);
+    }
+
+    /**
+     * Gestisce l'ottenimento delle informazioni su uno stream tramite AJAX
+     */
+    public function ajax_get_stream_info() {
+        // Verifica il nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'eto_twitch_nonce')) {
+            wp_send_json_error(['message' => __('Errore di sicurezza. Ricarica la pagina e riprova.', 'eto')]);
+        }
+        
+        // Verifica i parametri
+        if (!isset($_POST['match_id']) || !isset($_POST['channel'])) {
+            wp_send_json_error(['message' => __('Parametri mancanti.', 'eto')]);
+        }
+        
+        $match_id = intval($_POST['match_id']);
+        $channel = sanitize_text_field($_POST['channel']);
+        
+        // Verifica che il match esista
+        $match = get_post($match_id);
+        if (!$match || $match->post_type !== 'eto_match') {
+            wp_send_json_error(['message' => __('Match non trovato.', 'eto')]);
+        }
+        
+        // Verifica che il canale non sia vuoto
+        if (empty($channel)) {
+            wp_send_json_error(['message' => __('Canale non specificato.', 'eto')]);
+        }
+        
+        // Aggiorna le informazioni sullo stream
+        $stream_info = $this->update_stream_info($match_id, $channel);
+        
+        if (is_wp_error($stream_info)) {
+            wp_send_json_error(['message' => $stream_info->get_error_message()]);
+        }
+        
+        wp_send_json_success(['stream_info' => $stream_info]);
+    }
+
+    /**
+     * Cerca canali su Twitch
+     *
+     * @param string $query Query di ricerca
+     * @return array|WP_Error Risultati della ricerca o errore
+     */
+    private function search_channels($query) {
+        // Verifica che le credenziali siano impostate
+        if (empty($this->client_id) || empty($this->access_token)) {
+            return new WP_Error('twitch_credentials', __('Credenziali Twitch non configurate.', 'eto'));
+        }
+        
+        // Prepara la richiesta
+        $url = 'https://api.twitch.tv/helix/search/channels?query=' . urlencode($query) . '&first=10';
+        
+        $response = wp_remote_get($url, [
+            'headers' => [
+                'Client-ID' => $this->client_id,
+                'Authorization' => 'Bearer ' . $this->access_token
+            ]
+        ]);
+        
+        // Verifica la risposta
+        if (is_wp_error($response)) {
+            return $response;
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        // Verifica che la risposta sia valida
+        if (!isset($data['data'])) {
+            return new WP_Error('twitch_api', __('Risposta API non valida.', 'eto'));
+        }
+        
+        return $data['data'];
+    }
+
+    /**
+     * Aggiorna le informazioni su uno stream
+     *
+     * @param int $match_id ID del match
+     * @param string $channel Nome del canale
+     * @return array|WP_Error Informazioni sullo stream o errore
+     */
+    public function update_stream_info($match_id, $channel) {
+        // Verifica che le credenziali siano impostate
+        if (empty($this->client_id) || empty($this->access_token)) {
+            return new WP_Error('twitch_credentials', __('Credenziali Twitch non configurate.', 'eto'));
+        }
+        
+        // Prepara la richiesta
+        $url = 'https://api.twitch.tv/helix/streams?user_login=' . urlencode($channel);
+        
+        $response = wp_remote_get($url, [
+            'headers' => [
+                'Client-ID' => $this->client_id,
+                'Authorization' => 'Bearer ' . $this->access_token
+            ]
+        ]);
+        
+        // Verifica la risposta
+        if (is_wp_error($response)) {
+            return $response;
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        // Verifica che la risposta sia valida
+        if (!isset($data['data'])) {
+            return new WP_Error('twitch_api', __('Risposta API non valida.', 'eto'));
+        }
+        
+        // Prepara le informazioni sullo stream
+        $stream_info = [
+            'is_live' => false,
+            'updated_at' => current_time('mysql')
+        ];
+        
+        // Se lo stream è live, ottieni le informazioni
+        if (!empty($data['data'])) {
+            $stream_data = $data['data'][0];
+            
+            $stream_info['is_live'] = true;
+            $stream_info['id'] = $stream_data['id'];
+            $stream_info['user_id'] = $stream_data['user_id'];
+            $stream_info['user_login'] = $stream_data['user_login'];
+            $stream_info['user_name'] = $stream_data['user_name'];
+            $stream_info['game_id'] = $stream_data['game_id'];
+            $stream_info['game_name'] = $stream_data['game_name'];
+            $stream_info['type'] = $stream_data['type'];
+            $stream_info['title'] = $stream_data['title'];
+            $stream_info['viewer_count'] = $stream_data['viewer_count'];
+            $stream_info['started_at'] = $stream_data['started_at'];
+            $stream_info['language'] = $stream_data['language'];
+            $stream_info['thumbnail_url'] = $stream_data['thumbnail_url'];
+            $stream_info['tag_ids'] = $stream_data['tag_ids'];
+            $stream_info['is_mature'] = $stream_data['is_mature'];
+        }
+        
+        // Salva le informazioni
+        update_post_meta($match_id, 'eto_twitch_stream_info', $stream_info);
+        
+        return $stream_info;
+    }
+
+    /**
+     * Aggiorna le informazioni su tutti gli stream attivi
+     */
+    public function update_live_streams() {
+        // Ottieni tutti i match con un canale Twitch impostato
+        $matches = get_posts([
+            'post_type' => 'eto_match',
+            'posts_per_page' => -1,
+            'meta_query' => [
+                [
+                    'key' => 'eto_twitch_channel',
+                    'value' => '',
+                    'compare' => '!='
+                ]
+            ]
+        ]);
+        
+        foreach ($matches as $match) {
+            $channel = get_post_meta($match->ID, 'eto_twitch_channel', true);
+            
+            if ($channel) {
+                $this->update_stream_info($match->ID, $channel);
+            }
+        }
+    }
+
+    /**
+     * Aggiorna il token di accesso per l'API di Twitch
+     */
+    public function refresh_access_token() {
+        // Verifica che le credenziali siano impostate
+        if (empty($this->client_id) || empty($this->client_secret)) {
+            return;
+        }
+        
+        // Prepara la richiesta
+        $url = 'https://id.twitch.tv/oauth2/token';
+        
+        $response = wp_remote_post($url, [
+            'body' => [
+                'client_id' => $this->client_id,
+                'client_secret' => $this->client_secret,
+                'grant_type' => 'client_credentials'
+            ]
+        ]);
+        
+        // Verifica la risposta
+        if (is_wp_error($response)) {
+            return;
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        // Verifica che la risposta sia valida
+        if (!isset($data['access_token'])) {
+            return;
+        }
+        
+        // Salva il token
+        $this->access_token = $data['access_token'];
+        update_option('eto_twitch_access_token', $data['access_token']);
+    }
+
+    /**
+     * Aggiunge una pagina di amministrazione per le impostazioni di Twitch
+     */
+    public function add_admin_page() {
+        add_submenu_page(
+            'eto-dashboard',
+            __('Impostazioni Twitch', 'eto'),
+            __('Twitch', 'eto'),
+            'manage_options',
+            'eto-twitch',
+            [$this, 'render_admin_page']
+        );
+    }
+
+    /**
+     * Renderizza la pagina di amministrazione per le impostazioni di Twitch
+     */
+    public function render_admin_page() {
+        // Gestisci il salvataggio delle impostazioni
+        if (isset($_POST['eto_twitch_save']) && isset($_POST['eto_twitch_nonce']) && wp_verify_nonce($_POST['eto_twitch_nonce'], 'eto_twitch_settings')) {
+            // Salva le impostazioni
+            if (isset($_POST['eto_twitch_client_id'])) {
+                $client_id = sanitize_text_field($_POST['eto_twitch_client_id']);
+                update_option('eto_twitch_client_id', $client_id);
+                $this->client_id = $client_id;
+            }
+            
+            if (isset($_POST['eto_twitch_client_secret'])) {
+                $client_secret = sanitize_text_field($_POST['eto_twitch_client_secret']);
+                update_option('eto_twitch_client_secret', $client_secret);
+                $this->client_secret = $client_secret;
+            }
+            
+            // Aggiorna il token di accesso
+            $this->refresh_access_token();
+            
+            echo '<div class="notice notice-success"><p>' . __('Impostazioni salvate con successo.', 'eto') . '</p></div>';
+        }
+        
+        // Renderizza la pagina
+        ?>
+        <div class="wrap">
+            <h1><?php _e('Impostazioni Twitch', 'eto'); ?></h1>
+            
+            <form method="post" action="">
+                <?php wp_nonce_field('eto_twitch_settings', 'eto_twitch_nonce'); ?>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><?php _e('Client ID', 'eto'); ?></th>
+                        <td>
+                            <input type="text" name="eto_twitch_client_id" value="<?php echo esc_attr($this->client_id); ?>" class="regular-text" />
+                            <p class="description"><?php _e('Il Client ID della tua applicazione Twitch.', 'eto'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Client Secret', 'eto'); ?></th>
+                        <td>
+                            <input type="password" name="eto_twitch_client_secret" value="<?php echo esc_attr($this->client_secret); ?>" class="regular-text" />
+                            <p class="description"><?php _e('Il Client Secret della tua applicazione Twitch.', 'eto'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Stato connessione', 'eto'); ?></th>
+                        <td>
+                            <?php if (!empty($this->client_id) && !empty($this->client_secret) && !empty($this->access_token)): ?>
+                            <span class="eto-twitch-connected"><?php _e('Connesso', 'eto'); ?></span>
+                            <?php else: ?>
+                            <span class="eto-twitch-disconnected"><?php _e('Non connesso', 'eto'); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </table>
+                
+                <h2><?php _e('Istruzioni', 'eto'); ?></h2>
+                
+                <p><?php _e('Per utilizzare l\'integrazione con Twitch, devi creare un\'applicazione su Twitch Developer Console:', 'eto'); ?></p>
+                
+                <ol>
+                    <li><?php _e('Vai su <a href="https://dev.twitch.tv/console/apps" target="_blank">https://dev.twitch.tv/console/apps</a>', 'eto'); ?></li>
+                    <li><?php _e('Clicca su "Register Your Application"', 'eto'); ?></li>
+                    <li><?php _e('Inserisci un nome per la tua applicazione', 'eto'); ?></li>
+                    <li><?php _e('Inserisci l\'URL di reindirizzamento (puoi usare l\'URL del tuo sito)', 'eto'); ?></li>
+                    <li><?php _e('Seleziona "Website Integration" come categoria', 'eto'); ?></li>
+                    <li><?php _e('Accetta i termini di servizio e clicca su "Create"', 'eto'); ?></li>
+                    <li><?php _e('Copia il Client ID e il Client Secret e incollali nei campi sopra', 'eto'); ?></li>
+                </ol>
+                
+                <h2><?php _e('Utilizzo', 'eto'); ?></h2>
+                
+                <p><?php _e('Puoi utilizzare i seguenti shortcode per visualizzare gli stream Twitch:', 'eto'); ?></p>
+                
+                <ul>
+                    <li><code>[eto_twitch_stream match_id="123"]</code> - <?php _e('Visualizza lo stream di un match specifico', 'eto'); ?></li>
+                    <li><code>[eto_twitch_stream channel="nome_canale"]</code> - <?php _e('Visualizza lo stream di un canale specifico', 'eto'); ?></li>
+                    <li><code>[eto_twitch_streams tournament_id="123"]</code> - <?php _e('Visualizza tutti gli stream di un torneo', 'eto'); ?></li>
+                </ul>
+                
+                <p class="submit">
+                    <input type="submit" name="eto_twitch_save" id="submit" class="button button-primary" value="<?php _e('Salva impostazioni', 'eto'); ?>">
+                </p>
+            </form>
+        </div>
+        
+        <style>
+        .eto-twitch-connected {
+            color: #46b450;
+            font-weight: bold;
+        }
+        
+        .eto-twitch-disconnected {
+            color: #dc3232;
+            font-weight: bold;
+        }
+        </style>
+        <?php
+    }
+}
