@@ -203,28 +203,42 @@ class ETO_Admin_Controller {
      * Renderizza la pagina dei tornei
      */
     public function render_tournaments_page() {
-        include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/tournaments.php');
+        include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/tournaments/list.php');
     }
     
     /**
      * Renderizza la pagina dei team
      */
     public function render_teams_page() {
-        include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/teams.php');
+        include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/teams/list.php');
     }
     
     /**
      * Renderizza la pagina dei partecipanti
      */
     public function render_participants_page() {
-        include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/participants.php');
+        // Verifica se esiste il file dei partecipanti, altrimenti usa un template vuoto
+        $participants_file = plugin_dir_path(dirname(__FILE__)) . 'admin/views/participants/list.php';
+        if (file_exists($participants_file)) {
+            include($participants_file);
+        } else {
+            echo '<div class="wrap"><h1>' . __('Partecipanti', 'eto') . '</h1>';
+            echo '<div class="notice notice-info"><p>' . __('Funzionalità in fase di sviluppo.', 'eto') . '</p></div></div>';
+        }
     }
     
     /**
      * Renderizza la pagina delle impostazioni
      */
     public function render_settings_page() {
-        include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/settings.php');
+        // Verifica se esiste il file delle impostazioni, altrimenti usa un template vuoto
+        $settings_file = plugin_dir_path(dirname(__FILE__)) . 'admin/views/settings/list.php';
+        if (file_exists($settings_file)) {
+            include($settings_file);
+        } else {
+            echo '<div class="wrap"><h1>' . __('Impostazioni', 'eto') . '</h1>';
+            echo '<div class="notice notice-info"><p>' . __('Funzionalità in fase di sviluppo.', 'eto') . '</p></div></div>';
+        }
     }
     
     /**
