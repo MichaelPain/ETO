@@ -275,59 +275,25 @@ function eto_display_admin_notices() {
 /**
  * Implementazione di fallback della funzione di sicurezza
  * Questa funzione viene sovrascritta dalla versione in utilities.php quando caricata
+ * 
+ * Nota: La funzione è stata rimossa da qui per evitare duplicazioni con utilities.php
+ * La definizione principale si trova in includes/utilities.php
  */
-if (!function_exists('eto_security')) {
-    function eto_security() {
-        // Implementazione semplice per compatibilità
-        if (class_exists('ETO_Security')) {
-            return new ETO_Security();
-        }
-        return new stdClass();
-    }
-}
 
 /**
  * Genera e verifica nonce per la sicurezza CSRF
  * Questa funzione viene sovrascritta dalla versione in utilities.php quando caricata
  */
-if (!function_exists('eto_verify_nonce')) {
-    function eto_verify_nonce($nonce_name, $action) {
-        if (!isset($_REQUEST[$nonce_name]) || !wp_verify_nonce($_REQUEST[$nonce_name], $action)) {
-            eto_add_admin_notice('error', __('Errore di sicurezza: token di verifica non valido.', 'eto'));
-            return false;
-        }
-        return true;
-    }
-}
+// La funzione eto_verify_nonce() è stata rimossa da qui per evitare duplicazioni
+// La definizione principale si trova in includes/utilities.php
 
 /**
  * Gestione sicura delle chiavi API
  * Questa funzione viene sovrascritta dalla versione in utilities.php quando caricata
+ * 
+ * Nota: La funzione è stata rimossa da qui per evitare duplicazioni con utilities.php
+ * La definizione principale si trova in includes/utilities.php
  */
-if (!function_exists('eto_get_api_key')) {
-    function eto_get_api_key($key_name) {
-        $encrypted_key = get_option('eto_api_key_' . sanitize_key($key_name));
-        if (empty($encrypted_key)) {
-            // Retrocompatibilità: prova a leggere dal file
-            $key_file = ETO_PLUGIN_DIR . '/keys/' . sanitize_file_name($key_name) . '.key';
-            if (file_exists($key_file)) {
-                $key_value = file_get_contents($key_file);
-                if (!empty($key_value)) {
-                    // Migra la chiave al database
-                    if (function_exists('eto_save_api_key')) {
-                        eto_save_api_key($key_name, trim($key_value));
-                    } else {
-                        update_option('eto_api_key_' . sanitize_key($key_name), wp_salt('auth') . trim($key_value));
-                    }
-                    return trim($key_value);
-                }
-            }
-            return false;
-        }
-        
-        return str_replace(wp_salt('auth'), '', $encrypted_key);
-    }
-}
 
 /**
  * Salva una chiave API in modo sicuro
