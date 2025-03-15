@@ -2,10 +2,10 @@
 /**
  * Classe per la gestione della sicurezza
  * 
- * Fornisce metodi per la protezione contro attacchi comuni
+ * Implementa funzionalità di sicurezza base per il plugin
  * 
  * @package ETO
- * @since 2.5.1
+ * @since 2.5.0
  */
 
 // Impedisci l'accesso diretto
@@ -14,407 +14,387 @@ if (!defined('ABSPATH')) exit;
 class ETO_Security {
     
     /**
-     * Istanza singleton
-     *
-     * @var ETO_Security
-     */
-    private static $instance = null;
-    
-    /**
-     * Ottiene l'istanza singleton
-     *
-     * @return ETO_Security
-     */
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
-    
-    /**
      * Costruttore
      */
-    private function __construct() {
-        // Inizializza i controlli di sicurezza
-        $this->init();
+    public function __construct() {
+        // Nessuna operazione specifica nel costruttore
     }
     
     /**
-     * Inizializza i controlli di sicurezza
+     * Verifica se un utente ha i permessi per un'azione
+     * 
+     * @param string $action Nome dell'azione
+     * @param int $user_id ID dell'utente (opzionale, usa l'utente corrente se non specificato)
+     * @return bool True se l'utente ha i permessi
      */
-    public function init() {
-        // Aggiungi filtri e azioni per la sicurezza
-        add_filter('eto_form_fields', [$this, 'add_nonce_field']);
-        add_action('init', [$this, 'register_security_headers']);
-        
-        // Proteggi contro attacchi XSS nei parametri GET
-        $this->sanitize_get_params();
-    }
-    
-    /**
-     * Aggiunge un campo nonce ai form
-     *
-     * @param array $fields Campi del form
-     * @return array Campi aggiornati
-     */
-    public function add_nonce_field($fields) {
-        $action = isset($fields['form_id']) ? 'eto_' . $fields['form_id'] : 'eto_default_action';
-        
-        $fields['_wpnonce'] = wp_nonce_field($action, '_wpnonce', true, false);
-        $fields['_wp_http_referer'] = wp_referer_field(false) ;
-        
-        return $fields;
-    }
-    
-    /**
-     * Registra header di sicurezza
-     */
-    public function register_security_headers() {
-        // Aggiungi header di sicurezza solo se non è una richiesta AJAX
-        if (!wp_doing_ajax()) {
-            // Content Security Policy
-            header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://ajax.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;") ;
-            
-            // X-XSS-Protection
-            header("X-XSS-Protection: 1; mode=block");
-            
-            // X-Content-Type-Options
-            header("X-Content-Type-Options: nosniff");
-            
-            // Referrer-Policy
-            header("Referrer-Policy: strict-origin-when-cross-origin");
-            
-            // Permissions-Policy
-            header("Permissions-Policy: geolocation=(), microphone=(), camera=()");
+    public function check_permission($action, $user_id = null) {
+        if ($user_id === null) {
+            $user_id = get_current_user_id();
         }
-    }
-    
-    /**
-     * Sanitizza i parametri GET
-     */
-    private function sanitize_get_params() {
-        foreach ($_GET as $key => $value) {
-            if (is_string($value)) {
-                $_GET[$key] = sanitize_text_field($value);
-            }
+        
+        // Gli amministratori hanno sempre tutti i permessi
+        if (user_can($user_id, 'manage_options')) {
+            return true;
+        }
+        
+        // Verifica i permessi specifici
+        switch ($action) {
+            case 'manage_tournaments':
+                return user_can($user_id, 'edit_posts');
+                
+            case 'manage_teams':
+                return user_can($user_id, 'edit_posts');
+                
+            case 'manage_matches':
+                return user_can($user_id, 'edit_posts');
+                
+            default:
+                return false;
         }
     }
     
     /**
      * Verifica un nonce
-     *
-     * @param string $nonce Valore del nonce
-     * @param string $action Azione associata al nonce
-     * @return bool True se il nonce è valido, false altrimenti
+     * 
+     * @param string $nonce Nonce da verificare
+     * @param string $action Nome dell'azione
+     * @return bool True se il nonce è valido
      */
     public function verify_nonce($nonce, $action) {
-        return wp_verify_nonce($nonce, $action);
+        return wp_verify_nonce($nonce, 'eto-' . $action);
     }
     
     /**
-     * Verifica un nonce da una richiesta
-     *
-     * @param string $action Azione associata al nonce
-     * @param string $nonce_name Nome del campo nonce (default: _wpnonce)
-     * @param bool $die Se terminare l'esecuzione in caso di nonce non valido
-     * @return bool True se il nonce è valido, false altrimenti
+     * Sanitizza un input
+     * 
+     * @param mixed $input Input da sanitizzare
+     * @param string $type Tipo di input (text, email, url, int, float)
+     * @return mixed Input sanitizzato
      */
-    public function verify_request_nonce($action, $nonce_name = '_wpnonce', $die = true) {
-        $nonce = isset($_REQUEST[$nonce_name]) ? $_REQUEST[$nonce_name] : '';
-        
-        if (!$this->verify_nonce($nonce, $action)) {
-            if ($die) {
-                wp_die(
-                    __('Errore di sicurezza: token di verifica non valido.', 'eto'),
-                    __('Errore di sicurezza', 'eto'),
-                    [
-                        'response' => 403,
-                        'back_link' => true,
-                    ]
-                );
-            }
-            return false;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Sanitizza un array ricorsivamente
-     *
-     * @param array $array Array da sanitizzare
-     * @return array Array sanitizzato
-     */
-    public function sanitize_array($array) {
-        foreach ($array as $key => $value) {
-            if (is_array($value)) {
-                $array[$key] = $this->sanitize_array($value);
-            } else {
-                $array[$key] = sanitize_text_field($value);
-            }
-        }
-        
-        return $array;
-    }
-    
-    /**
-     * Sanitizza i dati di un form in base al tipo
-     *
-     * @param array $data Dati del form
-     * @param array $fields_config Configurazione dei campi
-     * @return array Dati sanitizzati
-     */
-    public function sanitize_form_data($data, $fields_config) {
-        $sanitized = [];
-        
-        foreach ($fields_config as $field_name => $config) {
-            if (!isset($data[$field_name])) {
-                continue;
-            }
-            
-            $value = $data[$field_name];
-            
-            switch ($config['type']) {
-                case 'text':
-                case 'select':
-                case 'radio':
-                    $sanitized[$field_name] = sanitize_text_field($value);
-                    break;
-                    
-                case 'email':
-                    $sanitized[$field_name] = sanitize_email($value);
-                    break;
-                    
-                case 'url':
-                    $sanitized[$field_name] = esc_url_raw($value);
-                    break;
-                    
-                case 'textarea':
-                    $sanitized[$field_name] = sanitize_textarea_field($value);
-                    break;
-                    
-                case 'html':
-                    $allowed_html = isset($config['allowed_html']) ? $config['allowed_html'] : 'post';
-                    $sanitized[$field_name] = wp_kses($value, $allowed_html);
-                    break;
-                    
-                case 'int':
-                case 'number':
-                    $sanitized[$field_name] = intval($value);
-                    break;
-                    
-                case 'float':
-                    $sanitized[$field_name] = floatval($value);
-                    break;
-                    
-                case 'checkbox':
-                    $sanitized[$field_name] = isset($value) ? 1 : 0;
-                    break;
-                    
-                case 'array':
-                    if (is_array($value)) {
-                        $sanitized[$field_name] = $this->sanitize_array($value);
-                    } else {
-                        $sanitized[$field_name] = [];
-                    }
-                    break;
-                    
-                default:
-                    $sanitized[$field_name] = sanitize_text_field($value);
-            }
-        }
-        
-        return $sanitized;
-    }
-    
-    /**
-     * Valida i dati di un form in base alle regole
-     *
-     * @param array $data Dati del form
-     * @param array $rules Regole di validazione
-     * @return array Array di errori (vuoto se nessun errore)
-     */
-    public function validate_form_data($data, $rules) {
-        $errors = [];
-        
-        foreach ($rules as $field_name => $field_rules) {
-            $value = isset($data[$field_name]) ? $data[$field_name] : '';
-            
-            foreach ($field_rules as $rule => $rule_value) {
-                switch ($rule) {
-                    case 'required':
-                        if ($rule_value && empty($value)) {
-                            $errors[$field_name] = __('Questo campo è obbligatorio.', 'eto');
-                        }
-                        break;
-                        
-                    case 'email':
-                        if ($rule_value && !empty($value) && !is_email($value)) {
-                            $errors[$field_name] = __('Inserisci un indirizzo email valido.', 'eto');
-                        }
-                        break;
-                        
-                    case 'url':
-                        if ($rule_value && !empty($value) && !filter_var($value, FILTER_VALIDATE_URL)) {
-                            $errors[$field_name] = __('Inserisci un URL valido.', 'eto');
-                        }
-                        break;
-                        
-                    case 'min_length':
-                        if (!empty($value) && strlen($value) < $rule_value) {
-                            $errors[$field_name] = sprintf(__('Questo campo deve contenere almeno %d caratteri.', 'eto'), $rule_value);
-                        }
-                        break;
-                        
-                    case 'max_length':
-                        if (!empty($value) && strlen($value) > $rule_value) {
-                            $errors[$field_name] = sprintf(__('Questo campo non può contenere più di %d caratteri.', 'eto'), $rule_value);
-                        }
-                        break;
-                        
-                    case 'min':
-                        if (!empty($value) && floatval($value) < $rule_value) {
-                            $errors[$field_name] = sprintf(__('Il valore minimo è %s.', 'eto'), $rule_value);
-                        }
-                        break;
-                        
-                    case 'max':
-                        if (!empty($value) && floatval($value) > $rule_value) {
-                            $errors[$field_name] = sprintf(__('Il valore massimo è %s.', 'eto'), $rule_value);
-                        }
-                        break;
-                        
-                    case 'pattern':
-                        if (!empty($value) && !preg_match($rule_value, $value)) {
-                            $errors[$field_name] = __('Il formato non è valido.', 'eto');
-                        }
-                        break;
-                        
-                    case 'in':
-                        if (!empty($value) && !in_array($value, $rule_value)) {
-                            $errors[$field_name] = __('Il valore selezionato non è valido.', 'eto');
-                        }
-                        break;
-                }
+    public function sanitize_input($input, $type = 'text') {
+        switch ($type) {
+            case 'text':
+                return sanitize_text_field($input);
                 
-                // Se c'è già un errore per questo campo, passa al campo successivo
-                if (isset($errors[$field_name])) {
-                    break;
-                }
-            }
+            case 'email':
+                return sanitize_email($input);
+                
+            case 'url':
+                return esc_url_raw($input);
+                
+            case 'int':
+                return intval($input);
+                
+            case 'float':
+                return floatval($input);
+                
+            case 'html':
+                return wp_kses_post($input);
+                
+            default:
+                return sanitize_text_field($input);
         }
-        
-        return $errors;
     }
     
     /**
-     * Genera un token CSRF
-     *
-     * @param string $action Azione associata al token
-     * @return string Token CSRF
+     * Genera un token di sicurezza
+     * 
+     * @param string $action Nome dell'azione
+     * @return string Token generato
      */
-    public function generate_csrf_token($action) {
-        return wp_create_nonce('eto_csrf_' . $action);
-    }
-    
-    /**
-     * Verifica un token CSRF
-     *
-     * @param string $token Token da verificare
-     * @param string $action Azione associata al token
-     * @return bool True se il token è valido, false altrimenti
-     */
-    public function verify_csrf_token($token, $action) {
-        return wp_verify_nonce($token, 'eto_csrf_' . $action);
-    }
-    
-    /**
-     * Protegge contro attacchi CSRF
-     *
-     * @param string $action Azione associata al token
-     * @return bool True se la richiesta è sicura, false altrimenti
-     */
-    public function protect_against_csrf($action) {
-        // Verifica il metodo della richiesta
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            return false;
-        }
-        
-        // Verifica il referer
-        $referer = wp_get_referer();
-        if (!$referer) {
-            return false;
-        }
-        
-        $site_url = site_url();
-        if (strpos($referer, $site_url) !== 0) {
-            return false;
-        }
-        
-        // Verifica il token CSRF
-        $token = isset($_POST['_csrf_token']) ? $_POST['_csrf_token'] : '';
-        if (!$this->verify_csrf_token($token, $action)) {
-            return false;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Limita le richieste per prevenire attacchi di forza bruta
-     *
-     * @param string $action Identificatore dell'azione
-     * @param int $max_attempts Numero massimo di tentativi
-     * @param int $timeframe Intervallo di tempo in secondi
-     * @return bool True se la richiesta è consentita, false altrimenti
-     */
-    public function rate_limit($action, $max_attempts = 5, $timeframe = 300) {
-        $ip = $this->get_client_ip();
-        $key = 'eto_rate_limit_' . md5($action . '_' . $ip);
-        
-        // Ottieni i tentativi correnti
-        $attempts = get_transient($key);
-        
-        if ($attempts === false) {
-            // Prima richiesta, inizializza il contatore
-            set_transient($key, 1, $timeframe);
-            return true;
-        }
-        
-        if ($attempts >= $max_attempts) {
-            // Limite superato
-            return false;
-        }
-        
-        // Incrementa il contatore
-        set_transient($key, $attempts + 1, $timeframe);
-        return true;
-    }
-    
-    /**
-     * Ottiene l'indirizzo IP del client
-     *
-     * @return string Indirizzo IP
-     */
-    private function get_client_ip() {
-        $ip = '';
-        
-        // Proxy trusted
-        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ip = sanitize_text_field($_SERVER['HTTP_X_FORWARDED_FOR']);
-        } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
-            $ip = sanitize_text_field($_SERVER['REMOTE_ADDR']);
-        }
-        
-        // Validazione IP
-        $ip = filter_var($ip, FILTER_VALIDATE_IP);
-        
-        return $ip ?: '';
+    public function generate_token($action) {
+        return wp_create_nonce('eto-' . $action);
     }
 }
 
-// Inizializza la classe di sicurezza
-function eto_security() {
-    return ETO_Security::get_instance();
+/**
+ * Classe per la gestione della sicurezza avanzata
+ * 
+ * Estende la classe di sicurezza base con funzionalità avanzate
+ * 
+ * @package ETO
+ * @since 2.5.0
+ */
+class ETO_Security_Enhanced extends ETO_Security {
+    
+    /**
+     * Costruttore
+     */
+    public function __construct() {
+        parent::__construct();
+    }
+    
+    /**
+     * Verifica se un utente ha i permessi per un'azione su un oggetto specifico
+     * 
+     * @param string $action Nome dell'azione
+     * @param int $object_id ID dell'oggetto
+     * @param string $object_type Tipo di oggetto (tournament, team, match)
+     * @param int $user_id ID dell'utente (opzionale, usa l'utente corrente se non specificato)
+     * @return bool True se l'utente ha i permessi
+     */
+    public function check_object_permission($action, $object_id, $object_type, $user_id = null) {
+        if ($user_id === null) {
+            $user_id = get_current_user_id();
+        }
+        
+        // Gli amministratori hanno sempre tutti i permessi
+        if (user_can($user_id, 'manage_options')) {
+            return true;
+        }
+        
+        // Verifica i permessi specifici per tipo di oggetto
+        switch ($object_type) {
+            case 'tournament':
+                return $this->check_tournament_permission($action, $object_id, $user_id);
+                
+            case 'team':
+                return $this->check_team_permission($action, $object_id, $user_id);
+                
+            case 'match':
+                return $this->check_match_permission($action, $object_id, $user_id);
+                
+            default:
+                return false;
+        }
+    }
+    
+    /**
+     * Verifica se un utente ha i permessi per un'azione su un torneo
+     * 
+     * @param string $action Nome dell'azione
+     * @param int $tournament_id ID del torneo
+     * @param int $user_id ID dell'utente
+     * @return bool True se l'utente ha i permessi
+     */
+    private function check_tournament_permission($action, $tournament_id, $user_id) {
+        $tournament = new ETO_Tournament_Model($tournament_id);
+        
+        if (!$tournament) {
+            return false;
+        }
+        
+        // Il creatore del torneo ha tutti i permessi
+        if ($tournament->get('created_by') == $user_id) {
+            return true;
+        }
+        
+        // Verifica i permessi specifici
+        switch ($action) {
+            case 'view':
+                return true; // Tutti possono vedere i tornei
+                
+            case 'edit':
+            case 'delete':
+                return false; // Solo il creatore può modificare o eliminare
+                
+            default:
+                return false;
+        }
+    }
+    
+    /**
+     * Verifica se un utente ha i permessi per un'azione su un team
+     * 
+     * @param string $action Nome dell'azione
+     * @param int $team_id ID del team
+     * @param int $user_id ID dell'utente
+     * @return bool True se l'utente ha i permessi
+     */
+    private function check_team_permission($action, $team_id, $user_id) {
+        $team = new ETO_Team_Model($team_id);
+        
+        if (!$team) {
+            return false;
+        }
+        
+        // Il capitano del team ha tutti i permessi
+        if ($team->get('captain_id') == $user_id) {
+            return true;
+        }
+        
+        // Verifica se l'utente è un membro del team
+        $is_member = $team->is_member($user_id);
+        
+        // Verifica i permessi specifici
+        switch ($action) {
+            case 'view':
+                return true; // Tutti possono vedere i team
+                
+            case 'edit':
+            case 'delete':
+                return false; // Solo il capitano può modificare o eliminare
+                
+            case 'leave':
+                return $is_member; // Solo i membri possono lasciare il team
+                
+            default:
+                return false;
+        }
+    }
+    
+    /**
+     * Verifica se un utente ha i permessi per un'azione su un match
+     * 
+     * @param string $action Nome dell'azione
+     * @param int $match_id ID del match
+     * @param int $user_id ID dell'utente
+     * @return bool True se l'utente ha i permessi
+     */
+    private function check_match_permission($action, $match_id, $user_id) {
+        $match = new ETO_Match_Model($match_id);
+        
+        if (!$match) {
+            return false;
+        }
+        
+        $team1_id = $match->get('team1_id');
+        $team2_id = $match->get('team2_id');
+        
+        $team1 = $team1_id ? new ETO_Team_Model($team1_id) : null;
+        $team2 = $team2_id ? new ETO_Team_Model($team2_id) : null;
+        
+        $is_team1_captain = $team1 && $team1->get('captain_id') == $user_id;
+        $is_team2_captain = $team2 && $team2->get('captain_id') == $user_id;
+        
+        // Verifica i permessi specifici
+        switch ($action) {
+            case 'view':
+                return true; // Tutti possono vedere i match
+                
+            case 'report_result':
+                return $is_team1_captain || $is_team2_captain; // Solo i capitani possono riportare i risultati
+                
+            case 'edit':
+            case 'delete':
+                return false; // Solo gli admin possono modificare o eliminare
+                
+            default:
+                return false;
+        }
+    }
+}
+
+/**
+ * Classe per la gestione delle query al database sicure
+ * 
+ * Implementa funzionalità per eseguire query al database in modo sicuro
+ * 
+ * @package ETO
+ * @since 2.5.0
+ */
+class ETO_DB_Query_Secure {
+    
+    /**
+     * Costruttore
+     */
+    public function __construct() {
+        // Nessuna operazione specifica nel costruttore
+    }
+    
+    /**
+     * Esegue una query SELECT sicura
+     * 
+     * @param string $table Nome della tabella
+     * @param array $columns Colonne da selezionare
+     * @param array $where Condizioni WHERE (opzionale)
+     * @param string $order_by Ordinamento (opzionale)
+     * @param int $limit Limite di risultati (opzionale)
+     * @param int $offset Offset dei risultati (opzionale)
+     * @return array Risultati della query
+     */
+    public function select($table, $columns, $where = [], $order_by = '', $limit = 0, $offset = 0) {
+        global $wpdb;
+        
+        // Prepara la query
+        $query = "SELECT " . implode(', ', $columns) . " FROM $table";
+        
+        // Aggiungi le condizioni WHERE
+        if (!empty($where)) {
+            $query .= " WHERE ";
+            $conditions = [];
+            
+            foreach ($where as $column => $value) {
+                $conditions[] = "$column = %s";
+            }
+            
+            $query .= implode(' AND ', $conditions);
+        }
+        
+        // Aggiungi l'ordinamento
+        if (!empty($order_by)) {
+            $query .= " ORDER BY $order_by";
+        }
+        
+        // Aggiungi il limite
+        if ($limit > 0) {
+            $query .= " LIMIT $limit";
+            
+            if ($offset > 0) {
+                $query .= " OFFSET $offset";
+            }
+        }
+        
+        // Prepara i parametri
+        $params = [];
+        
+        if (!empty($where)) {
+            foreach ($where as $value) {
+                $params[] = $value;
+            }
+        }
+        
+        // Esegui la query
+        if (empty($params)) {
+            return $wpdb->get_results($query);
+        } else {
+            return $wpdb->get_results($wpdb->prepare($query, $params));
+        }
+    }
+    
+    /**
+     * Esegue una query INSERT sicura
+     * 
+     * @param string $table Nome della tabella
+     * @param array $data Dati da inserire
+     * @return int|false ID dell'elemento inserito o false in caso di errore
+     */
+    public function insert($table, $data) {
+        global $wpdb;
+        
+        $result = $wpdb->insert($table, $data);
+        
+        if ($result) {
+            return $wpdb->insert_id;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Esegue una query UPDATE sicura
+     * 
+     * @param string $table Nome della tabella
+     * @param array $data Dati da aggiornare
+     * @param array $where Condizioni WHERE
+     * @return int|false Numero di righe aggiornate o false in caso di errore
+     */
+    public function update($table, $data, $where) {
+        global $wpdb;
+        
+        return $wpdb->update($table, $data, $where);
+    }
+    
+    /**
+     * Esegue una query DELETE sicura
+     * 
+     * @param string $table Nome della tabella
+     * @param array $where Condizioni WHERE
+     * @return int|false Numero di righe eliminate o false in caso di errore
+     */
+    public function delete($table, $where) {
+        global $wpdb;
+        
+        return $wpdb->delete($table, $where);
+    }
 }

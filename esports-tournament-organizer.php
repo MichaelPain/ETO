@@ -299,6 +299,9 @@ function eto_activate() {
     
     // Crea/aggiorna le tabelle del database
     require_once(ETO_PLUGIN_DIR . '/includes/class-database-manager.php');
+    require_once(ETO_PLUGIN_DIR . '/includes/class-third-place-match.php');
+    require_once(ETO_PLUGIN_DIR . '/includes/class-match-screenshots.php');
+    require_once(ETO_PLUGIN_DIR . '/includes/class-individual-tournament.php');
     $db_manager = new ETO_Database_Manager();
     $db_manager->create_tables();
     

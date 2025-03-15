@@ -2,10 +2,10 @@
 /**
  * Classe per la gestione del database
  * 
- * Gestisce la creazione, l'aggiornamento e la manutenzione delle tabelle del database
+ * Gestisce la creazione e l'aggiornamento delle tabelle del database
  * 
  * @package ETO
- * @since 2.5.1
+ * @since 2.5.0
  */
 
 // Impedisci l'accesso diretto
@@ -14,335 +14,243 @@ if (!defined('ABSPATH')) exit;
 class ETO_Database_Manager {
     
     /**
-     * Prefisso delle tabelle del plugin
-     *
-     * @var string
-     */
-    private $table_prefix;
-    
-    /**
      * Versione corrente del database
      *
      * @var string
      */
-    private $db_version;
+    private $db_version = '2.6.0';
     
     /**
      * Costruttore
      */
     public function __construct() {
-        global $wpdb;
-        
-        $this->table_prefix = $wpdb->prefix . 'eto_';
-        $this->db_version = get_option('eto_db_version', '0');
+        // Nessuna operazione specifica nel costruttore
     }
     
     /**
      * Crea o aggiorna le tabelle del database
      *
-     * @return bool True se l'operazione è riuscita, false altrimenti
+     * @return void
      */
     public function create_tables() {
         global $wpdb;
         
         $charset_collate = $wpdb->get_charset_collate();
-        $success = true;
         
-        // Inizia la transazione
-        $wpdb->query('START TRANSACTION');
+        // Tabella dei tornei
+        $table_tournaments = $wpdb->prefix . 'eto_tournaments';
+        $sql_tournaments = "CREATE TABLE $table_tournaments (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            name varchar(255) NOT NULL,
+            description text,
+            start_date datetime,
+            end_date datetime,
+            registration_start datetime,
+            registration_end datetime,
+            max_teams smallint(5) NOT NULL DEFAULT 8,
+            min_teams smallint(5) NOT NULL DEFAULT 2,
+            format varchar(50) NOT NULL DEFAULT 'single_elimination',
+            game varchar(50) NOT NULL DEFAULT '',
+            status varchar(20) NOT NULL DEFAULT 'draft',
+            third_place_match tinyint(1) NOT NULL DEFAULT 0,
+            is_individual tinyint(1) NOT NULL DEFAULT 0,
+            created_by bigint(20) NOT NULL,
+            created_at datetime NOT NULL,
+            updated_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            KEY format (format),
+            KEY game (game),
+            KEY status (status)
+        ) $charset_collate;";
         
-        try {
-            // Tabella tornei
-            $table_tournaments = $this->table_prefix . 'tournaments';
-            $sql_tournaments = "CREATE TABLE $table_tournaments (
-                id mediumint(9) NOT NULL AUTO_INCREMENT,
-                name varchar(255) NOT NULL,
-                description text,
-                format varchar(50) NOT NULL,
-                elimination_type varchar(20) DEFAULT 'single',
-                status varchar(20) NOT NULL DEFAULT 'pending',
-                start_date datetime DEFAULT NULL,
-                end_date datetime DEFAULT NULL,
-                max_teams smallint(5) NOT NULL DEFAULT 8,
-                created_by bigint(20) NOT NULL,
-                created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-                PRIMARY KEY  (id),
-                KEY idx_status (status),
-                KEY idx_dates (start_date, end_date),
-                KEY idx_format (format)
-            ) $charset_collate ENGINE=InnoDB;";
-            
-            // Tabella team
-            $table_teams = $this->table_prefix . 'teams';
-            $sql_teams = "CREATE TABLE $table_teams (
-                id mediumint(9) NOT NULL AUTO_INCREMENT,
-                name varchar(255) NOT NULL,
-                logo varchar(255),
-                captain_id bigint(20) NOT NULL,
-                created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-                PRIMARY KEY  (id),
-                KEY idx_captain (captain_id)
-            ) $charset_collate ENGINE=InnoDB;";
-            
-            // Tabella membri team
-            $table_team_members = $this->table_prefix . 'team_members';
-            $sql_team_members = "CREATE TABLE $table_team_members (
-                id mediumint(9) NOT NULL AUTO_INCREMENT,
-                team_id mediumint(9) NOT NULL,
-                user_id bigint(20) NOT NULL,
-                role varchar(50) DEFAULT 'member',
-                joined_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY  (id),
-                UNIQUE KEY idx_team_user (team_id, user_id),
-                KEY idx_user (user_id),
-                FOREIGN KEY (team_id) REFERENCES {$this->table_prefix}teams(id) ON DELETE CASCADE
-            ) $charset_collate ENGINE=InnoDB;";
-            
-            // Tabella partite
-            $table_matches = $this->table_prefix . 'matches';
-            $sql_matches = "CREATE TABLE $table_matches (
-                id mediumint(9) NOT NULL AUTO_INCREMENT,
-                tournament_id mediumint(9) NOT NULL,
-                team1_id mediumint(9),
-                team2_id mediumint(9),
-                team1_score tinyint(3) DEFAULT 0,
-                team2_score tinyint(3) DEFAULT 0,
-                round tinyint(3) NOT NULL,
-                match_number smallint(5) NOT NULL,
-                status varchar(20) DEFAULT 'pending',
-                scheduled_at datetime DEFAULT NULL,
-                completed_at datetime DEFAULT NULL,
-                created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-                PRIMARY KEY  (id),
-                KEY idx_tournament (tournament_id),
-                KEY idx_teams (team1_id, team2_id),
-                KEY idx_status (status),
-                FOREIGN KEY (tournament_id) REFERENCES {$this->table_prefix}tournaments(id) ON DELETE CASCADE,
-                FOREIGN KEY (team1_id) REFERENCES {$this->table_prefix}teams(id) ON DELETE SET NULL,
-                FOREIGN KEY (team2_id) REFERENCES {$this->table_prefix}teams(id) ON DELETE SET NULL
-            ) $charset_collate ENGINE=InnoDB;";
-            
-            // Tabella iscrizioni torneo
-            $table_tournament_entries = $this->table_prefix . 'tournament_entries';
-            $sql_tournament_entries = "CREATE TABLE $table_tournament_entries (
-                id mediumint(9) NOT NULL AUTO_INCREMENT,
-                tournament_id mediumint(9) NOT NULL,
-                team_id mediumint(9) NOT NULL,
-                status varchar(20) DEFAULT 'registered',
-                seed smallint(5) DEFAULT NULL,
-                checked_in tinyint(1) DEFAULT 0,
-                checked_in_at datetime DEFAULT NULL,
-                created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY  (id),
-                UNIQUE KEY idx_tournament_team (tournament_id, team_id),
-                KEY idx_tournament (tournament_id),
-                KEY idx_team (team_id),
-                KEY idx_status (status),
-                FOREIGN KEY (tournament_id) REFERENCES {$this->table_prefix}tournaments(id) ON DELETE CASCADE,
-                FOREIGN KEY (team_id) REFERENCES {$this->table_prefix}teams(id) ON DELETE CASCADE
-            ) $charset_collate ENGINE=InnoDB;";
-            
-            // Tabella log audit
-            $table_audit_logs = $this->table_prefix . 'audit_logs';
-            $sql_audit_logs = "CREATE TABLE $table_audit_logs (
-                id bigint(20) NOT NULL AUTO_INCREMENT,
-                user_id bigint(20),
-                action varchar(100) NOT NULL,
-                object_type varchar(50) NOT NULL,
-                object_id bigint(20),
-                details text,
-                ip_address varchar(45),
-                created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY  (id),
-                KEY idx_user (user_id),
-                KEY idx_action (action),
-                KEY idx_object (object_type, object_id),
-                KEY idx_created_at (created_at)
-            ) $charset_collate ENGINE=InnoDB;";
-            
-            // Esegui le query di creazione tabelle
-            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-            
-            dbDelta($sql_tournaments);
-            dbDelta($sql_teams);
-            dbDelta($sql_team_members);
-            dbDelta($sql_matches);
-            dbDelta($sql_tournament_entries);
-            dbDelta($sql_audit_logs);
-            
-            // Aggiorna la versione del database
-            update_option('eto_db_version', '2.5.1');
-            
-            // Commit della transazione
-            $wpdb->query('COMMIT');
-            
-        } catch (Exception $e) {
-            // Rollback in caso di errore
-            $wpdb->query('ROLLBACK');
-            
-            if (defined('ETO_DEBUG') && ETO_DEBUG) {
-                error_log('[ETO] Errore creazione tabelle: ' . $e->getMessage());
-            }
-            
-            eto_add_admin_notice('error', __('Errore durante la creazione delle tabelle del database.', 'eto'));
-            $success = false;
-        }
+        // Tabella dei team
+        $table_teams = $wpdb->prefix . 'eto_teams';
+        $sql_teams = "CREATE TABLE $table_teams (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            name varchar(255) NOT NULL,
+            slug varchar(255) NOT NULL,
+            description text,
+            logo varchar(255),
+            captain_id bigint(20) NOT NULL,
+            game varchar(50) NOT NULL DEFAULT '',
+            status varchar(20) NOT NULL DEFAULT 'active',
+            created_by bigint(20) NOT NULL,
+            created_at datetime NOT NULL,
+            updated_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY slug (slug),
+            KEY captain_id (captain_id),
+            KEY game (game),
+            KEY status (status)
+        ) $charset_collate;";
         
-        return $success;
+        // Tabella dei membri del team
+        $table_team_members = $wpdb->prefix . 'eto_team_members';
+        $sql_team_members = "CREATE TABLE $table_team_members (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            team_id bigint(20) NOT NULL,
+            user_id bigint(20) NOT NULL,
+            role varchar(50) NOT NULL DEFAULT 'player',
+            game_id varchar(255),
+            joined_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY team_user (team_id,user_id),
+            KEY team_id (team_id),
+            KEY user_id (user_id)
+        ) $charset_collate;";
+        
+        // Tabella delle iscrizioni ai tornei
+        $table_tournament_entries = $wpdb->prefix . 'eto_tournament_entries';
+        $sql_tournament_entries = "CREATE TABLE $table_tournament_entries (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            tournament_id bigint(20) NOT NULL,
+            team_id bigint(20) NOT NULL,
+            seed int(11) NOT NULL DEFAULT 0,
+            checked_in tinyint(1) NOT NULL DEFAULT 0,
+            created_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY tournament_team (tournament_id,team_id),
+            KEY tournament_id (tournament_id),
+            KEY team_id (team_id)
+        ) $charset_collate;";
+        
+        // Tabella dei match
+        $table_matches = $wpdb->prefix . 'eto_matches';
+        $sql_matches = "CREATE TABLE $table_matches (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            tournament_id bigint(20) NOT NULL,
+            team1_id bigint(20),
+            team2_id bigint(20),
+            round int(11) NOT NULL,
+            match_number int(11) NOT NULL,
+            scheduled_date datetime,
+            status varchar(20) NOT NULL DEFAULT 'pending',
+            winner_id bigint(20),
+            loser_id bigint(20),
+            is_third_place_match tinyint(1) NOT NULL DEFAULT 0,
+            created_at datetime NOT NULL,
+            updated_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            KEY tournament_id (tournament_id),
+            KEY team1_id (team1_id),
+            KEY team2_id (team2_id),
+            KEY round (round),
+            KEY status (status)
+        ) $charset_collate;";
+        
+        // Tabella dei risultati dei match
+        $table_match_results = $wpdb->prefix . 'eto_match_results';
+        $sql_match_results = "CREATE TABLE $table_match_results (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            match_id bigint(20) NOT NULL,
+            team1_score int(11) NOT NULL DEFAULT 0,
+            team2_score int(11) NOT NULL DEFAULT 0,
+            created_at datetime NOT NULL,
+            updated_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY match_id (match_id),
+            KEY team1_score (team1_score),
+            KEY team2_score (team2_score)
+        ) $charset_collate;";
+        
+        // Tabella dei metadati dei tornei
+        $table_tournament_meta = $wpdb->prefix . 'eto_tournament_meta';
+        $sql_tournament_meta = "CREATE TABLE $table_tournament_meta (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            tournament_id bigint(20) NOT NULL,
+            meta_key varchar(255) NOT NULL,
+            meta_value longtext,
+            PRIMARY KEY  (id),
+            KEY tournament_id (tournament_id),
+            KEY meta_key (meta_key)
+        ) $charset_collate;";
+        
+        // Tabella dei metadati dei team
+        $table_team_meta = $wpdb->prefix . 'eto_team_meta';
+        $sql_team_meta = "CREATE TABLE $table_team_meta (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            team_id bigint(20) NOT NULL,
+            meta_key varchar(255) NOT NULL,
+            meta_value longtext,
+            PRIMARY KEY  (id),
+            KEY team_id (team_id),
+            KEY meta_key (meta_key)
+        ) $charset_collate;";
+        
+        // Tabella dei metadati dei match
+        $table_match_meta = $wpdb->prefix . 'eto_match_meta';
+        $sql_match_meta = "CREATE TABLE $table_match_meta (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            match_id bigint(20) NOT NULL,
+            meta_key varchar(255) NOT NULL,
+            meta_value longtext,
+            PRIMARY KEY  (id),
+            KEY match_id (match_id),
+            KEY meta_key (meta_key)
+        ) $charset_collate;";
+        
+        // Tabella degli screenshot dei match
+        $table_match_screenshots = $wpdb->prefix . 'eto_match_screenshots';
+        $sql_match_screenshots = "CREATE TABLE $table_match_screenshots (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            match_id bigint(20) NOT NULL,
+            user_id bigint(20) NOT NULL,
+            team_id bigint(20) NOT NULL,
+            file_path varchar(255) NOT NULL,
+            uploaded_at datetime NOT NULL,
+            status varchar(20) NOT NULL DEFAULT 'pending',
+            validated_by_opponent tinyint(1) NOT NULL DEFAULT 0,
+            validated_by_admin tinyint(1) NOT NULL DEFAULT 0,
+            validation_notes text,
+            PRIMARY KEY  (id),
+            KEY match_id (match_id),
+            KEY user_id (user_id),
+            KEY team_id (team_id),
+            KEY status (status)
+        ) $charset_collate;";
+        
+        // Tabella dei partecipanti individuali
+        $table_individual_participants = $wpdb->prefix . 'eto_individual_participants';
+        $sql_individual_participants = "CREATE TABLE $table_individual_participants (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            tournament_id bigint(20) NOT NULL,
+            user_id bigint(20) NOT NULL,
+            seed int(11) NOT NULL DEFAULT 0,
+            checked_in tinyint(1) NOT NULL DEFAULT 0,
+            created_at datetime NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY tournament_user (tournament_id,user_id),
+            KEY tournament_id (tournament_id),
+            KEY user_id (user_id)
+        ) $charset_collate;";
+        
+        // Carica il file necessario per dbDelta
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        
+        // Crea o aggiorna le tabelle
+        dbDelta($sql_tournaments);
+        dbDelta($sql_teams);
+        dbDelta($sql_team_members);
+        dbDelta($sql_tournament_entries);
+        dbDelta($sql_matches);
+        dbDelta($sql_match_results);
+        dbDelta($sql_tournament_meta);
+        dbDelta($sql_team_meta);
+        dbDelta($sql_match_meta);
+        dbDelta($sql_match_screenshots);
+        dbDelta($sql_individual_participants);
+        
+        // Aggiorna la versione del database
+        update_option('eto_db_version', $this->db_version);
     }
     
     /**
-     * Esegue la migrazione dei dati tra versioni
+     * Verifica se è necessario un aggiornamento del database
      *
-     * @return bool True se l'operazione è riuscita, false altrimenti
+     * @return bool True se è necessario un aggiornamento, false altrimenti
      */
-    public function migrate_data() {
-        global $wpdb;
-        
-        $current_version = $this->db_version;
-        $target_version = '2.5.1';
-        $success = true;
-        
-        // Se siamo già alla versione corrente, non fare nulla
-        if (version_compare($current_version, $target_version, '>=')) {
-            return true;
-        }
-        
-        // Inizia la transazione
-        $wpdb->query('START TRANSACTION');
-        
-        try {
-            // Migrazione dalla versione 1.0 alla 2.0
-            if (version_compare($current_version, '2.0', '<')) {
-                // Aggiungi campo elimination_type alla tabella tournaments
-                $table_tournaments = $this->table_prefix . 'tournaments';
-                $column_exists = $wpdb->get_results($wpdb->prepare(
-                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
-                    WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s",
-                    DB_NAME, $table_tournaments, 'elimination_type'
-                ));
-                
-                if (empty($column_exists)) {
-                    $wpdb->query("ALTER TABLE $table_tournaments ADD COLUMN elimination_type VARCHAR(20) DEFAULT 'single' AFTER format");
-                }
-            }
-            
-            // Migrazione dalla versione 2.0 alla 2.5
-            if (version_compare($current_version, '2.5', '<')) {
-                // Aggiungi indici per migliorare le performance
-                $table_matches = $this->table_prefix . 'matches';
-                $wpdb->query("ALTER TABLE $table_matches ADD INDEX idx_status (status)");
-                
-                // Converti tutte le tabelle a InnoDB
-                $tables = [
-                    $this->table_prefix . 'tournaments',
-                    $this->table_prefix . 'teams',
-                    $this->table_prefix . 'team_members',
-                    $this->table_prefix . 'matches',
-                    $this->table_prefix . 'tournament_entries',
-                    $this->table_prefix . 'audit_logs'
-                ];
-                
-                foreach ($tables as $table) {
-                    $wpdb->query("ALTER TABLE $table ENGINE = InnoDB");
-                }
-            }
-            
-            // Aggiorna la versione del database
-            update_option('eto_db_version', $target_version);
-            
-            // Commit della transazione
-            $wpdb->query('COMMIT');
-            
-        } catch (Exception $e) {
-            // Rollback in caso di errore
-            $wpdb->query('ROLLBACK');
-            
-            if (defined('ETO_DEBUG') && ETO_DEBUG) {
-                error_log('[ETO] Errore migrazione dati: ' . $e->getMessage());
-            }
-            
-            eto_add_admin_notice('error', __('Errore durante la migrazione dei dati del database.', 'eto'));
-            $success = false;
-        }
-        
-        return $success;
-    }
-    
-    /**
-     * Ottiene il nome completo di una tabella
-     *
-     * @param string $table Nome della tabella senza prefisso
-     * @return string Nome completo della tabella
-     */
-    public function get_table_name($table) {
-        return $this->table_prefix . $table;
-    }
-    
-    /**
-     * Verifica l'integrità del database
-     *
-     * @return array Array di problemi riscontrati
-     */
-    public function check_integrity() {
-        global $wpdb;
-        
-        $issues = [];
-        $tables = [
-            'tournaments',
-            'teams',
-            'team_members',
-            'matches',
-            'tournament_entries',
-            'audit_logs'
-        ];
-        
-        foreach ($tables as $table) {
-            $table_name = $this->table_prefix . $table;
-            
-            // Verifica se la tabella esiste
-            $table_exists = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM information_schema.tables 
-                WHERE table_schema = %s AND table_name = %s",
-                DB_NAME, $table_name
-            ));
-            
-            if (!$table_exists) {
-                $issues[] = sprintf(__('Tabella mancante: %s', 'eto'), $table_name);
-                continue;
-            }
-            
-            // Verifica l'engine della tabella
-            $engine = $wpdb->get_var($wpdb->prepare(
-                "SELECT engine FROM information_schema.tables 
-                WHERE table_schema = %s AND table_name = %s",
-                DB_NAME, $table_name
-            ));
-            
-            if ($engine !== 'InnoDB') {
-                $issues[] = sprintf(__('Tabella %s: engine non ottimale (%s invece di InnoDB)', 'eto'), $table_name, $engine);
-            }
-        }
-        
-        return $issues;
-    }
-    
-    /**
-     * Ripara il database
-     *
-     * @return bool True se l'operazione è riuscita, false altrimenti
-     */
-    public function repair_database() {
-        $issues = $this->check_integrity();
-        
-        if (empty($issues)) {
-            return true;
-        }
-        
-        // Se ci sono problemi, ricrea le tabelle
-        return $this->create_tables();
+    public function needs_upgrade() {
+        $current_version = get_option('eto_db_version', '0');
+        return version_compare($current_version, $this->db_version, '<');
     }
 }
