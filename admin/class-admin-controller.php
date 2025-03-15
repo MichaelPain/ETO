@@ -102,6 +102,52 @@ class ETO_Admin_Controller {
             'eto-settings',
             [$this, 'render_settings_page']
         );
+        
+        // Pagine nascoste per aggiunta/modifica
+        add_submenu_page(
+            null,
+            __('Aggiungi Torneo', 'eto'),
+            __('Aggiungi Torneo', 'eto'),
+            'manage_options',
+            'eto-add-tournament',
+            [$this, 'render_add_tournament_page']
+        );
+        
+        add_submenu_page(
+            null,
+            __('Modifica Torneo', 'eto'),
+            __('Modifica Torneo', 'eto'),
+            'manage_options',
+            'eto-edit-tournament',
+            [$this, 'render_edit_tournament_page']
+        );
+        
+        add_submenu_page(
+            null,
+            __('Aggiungi Team', 'eto'),
+            __('Aggiungi Team', 'eto'),
+            'manage_options',
+            'eto-add-team',
+            [$this, 'render_add_team_page']
+        );
+        
+        add_submenu_page(
+            null,
+            __('Modifica Team', 'eto'),
+            __('Modifica Team', 'eto'),
+            'manage_options',
+            'eto-edit-team',
+            [$this, 'render_edit_team_page']
+        );
+        
+        add_submenu_page(
+            null,
+            __('Aggiungi Partecipante', 'eto'),
+            __('Aggiungi Partecipante', 'eto'),
+            'manage_options',
+            'eto-add-participant',
+            [$this, 'render_add_participant_page']
+        );
     }
     
     /**
@@ -196,29 +242,13 @@ class ETO_Admin_Controller {
      * Gestisce le azioni per i tornei
      */
     public function handle_tournament_actions() {
-        // Verifica se è richiesta l'aggiunta di un nuovo torneo
-        if (isset($_GET['action']) && $_GET['action'] === 'add_tournament') {
-            $this->render_add_tournament_page();
-            exit;
-        }
-        
-        // Verifica se è richiesta l'aggiunta di un nuovo team
-        if (isset($_GET['action']) && $_GET['action'] === 'add_team') {
-            $this->render_add_team_page();
-            exit;
-        }
+        // Non è più necessario gestire qui le azioni, poiché ora utilizziamo pagine dedicate
     }
     
     /**
      * Renderizza la pagina dei tornei
      */
     public function render_tournaments_page() {
-        // Verifica se è richiesta l'aggiunta di un nuovo torneo
-        if (isset($_GET['action']) && $_GET['action'] === 'add') {
-            $this->render_add_tournament_page();
-            return;
-        }
-        
         // Inizializza le variabili necessarie per la vista
         $total_pages = 1;
         $total_tournaments = 0;
@@ -242,15 +272,34 @@ class ETO_Admin_Controller {
     }
     
     /**
+     * Renderizza la pagina di modifica di un torneo
+     */
+    public function render_edit_tournament_page() {
+        // Verifica l'ID del torneo
+        if (!isset($_GET['id']) || empty($_GET['id'])) {
+            wp_die(__('ID torneo mancante', 'eto'));
+        }
+        
+        $tournament_id = intval($_GET['id']);
+        
+        // Ottieni i dati del torneo
+        $tournament = $this->db_query->get_tournament($tournament_id);
+        
+        if (!$tournament) {
+            wp_die(__('Torneo non trovato', 'eto'));
+        }
+        
+        // Inizializza le variabili necessarie per la vista
+        $games = $this->get_available_games();
+        $formats = $this->get_available_formats();
+        
+        include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/tournaments/edit.php');
+    }
+    
+    /**
      * Renderizza la pagina dei team
      */
     public function render_teams_page() {
-        // Verifica se è richiesta l'aggiunta di un nuovo team
-        if (isset($_GET['action']) && $_GET['action'] === 'add') {
-            $this->render_add_team_page();
-            return;
-        }
-        
         // Inizializza le variabili necessarie per la vista
         $games = $this->get_available_games();
         
@@ -268,6 +317,30 @@ class ETO_Admin_Controller {
         $games = $this->get_available_games();
         
         include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/teams/add.php');
+    }
+    
+    /**
+     * Renderizza la pagina di modifica di un team
+     */
+    public function render_edit_team_page() {
+        // Verifica l'ID del team
+        if (!isset($_GET['id']) || empty($_GET['id'])) {
+            wp_die(__('ID team mancante', 'eto'));
+        }
+        
+        $team_id = intval($_GET['id']);
+        
+        // Ottieni i dati del team
+        $team = $this->db_query->get_team($team_id);
+        
+        if (!$team) {
+            wp_die(__('Team non trovato', 'eto'));
+        }
+        
+        // Inizializza le variabili necessarie per la vista
+        $games = $this->get_available_games();
+        
+        include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/teams/edit.php');
     }
     
     /**
@@ -297,12 +370,40 @@ if (!defined(\'ABSPATH\')) exit;
 ?>
 
 <div class="wrap">
-    <h1><?php _e(\'Partecipanti\', \'eto\'); ?></h1>
+    <h1 class="wp-heading-inline"><?php _e(\'Partecipanti\', \'eto\'); ?></h1>
+    <a href="<?php echo admin_url(\'admin.php?page=eto-add-participant\'); ?>" class="page-title-action"><?php _e(\'Aggiungi Nuovo\', \'eto\'); ?></a>
+    
+    <hr class="wp-header-end">
     
     <div class="tablenav top">
         <div class="alignleft actions">
-            <a href="<?php echo admin_url(\'admin.php?page=eto-participants&action=add\'); ?>" class="button button-primary"><?php _e(\'Aggiungi Nuovo\', \'eto\'); ?></a>
+            <form method="get">
+                <input type="hidden" name="page" value="eto-participants">
+                
+                <select name="tournament">
+                    <option value=""><?php _e(\'Tutti i tornei\', \'eto\'); ?></option>
+                    <?php 
+                    $tournaments = $this->db_query->get_tournaments();
+                    foreach ($tournaments as $tournament) : 
+                    ?>
+                        <option value="<?php echo esc_attr($tournament[\'id\']); ?>" <?php selected(isset($_GET[\'tournament\']) ? $_GET[\'tournament\'] : \'\', $tournament[\'id\']); ?>><?php echo esc_html($tournament[\'name\']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                
+                <select name="team">
+                    <option value=""><?php _e(\'Tutti i team\', \'eto\'); ?></option>
+                    <?php 
+                    $teams = $this->db_query->get_teams();
+                    foreach ($teams as $team) : 
+                    ?>
+                        <option value="<?php echo esc_attr($team[\'id\']); ?>" <?php selected(isset($_GET[\'team\']) ? $_GET[\'team\'] : \'\', $team[\'id\']); ?>><?php echo esc_html($team[\'name\']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                
+                <input type="submit" class="button" value="<?php _e(\'Filtra\', \'eto\'); ?>">
+            </form>
         </div>
+        
         <br class="clear">
     </div>
     
@@ -327,7 +428,7 @@ if (!defined(\'ABSPATH\')) exit;
                         <td class="column-name column-primary">
                             <strong><?php echo esc_html($participant->name); ?></strong>
                             <div class="row-actions">
-                                <span class="edit"><a href="<?php echo admin_url(\'admin.php?page=eto-participants&action=edit&id=\' . $participant->id); ?>"><?php _e(\'Modifica\', \'eto\'); ?></a> | </span>
+                                <span class="edit"><a href="<?php echo admin_url(\'admin.php?page=eto-edit-participant&id=\' . $participant->id); ?>"><?php _e(\'Modifica\', \'eto\'); ?></a> | </span>
                                 <span class="delete"><a href="#" class="eto-delete-participant" data-id="<?php echo $participant->id; ?>"><?php _e(\'Elimina\', \'eto\'); ?></a></span>
                             </div>
                         </td>
@@ -335,7 +436,7 @@ if (!defined(\'ABSPATH\')) exit;
                         <td class="column-team"><?php echo esc_html($participant->team_name); ?></td>
                         <td class="column-tournaments"><?php echo count($participant->tournaments); ?></td>
                         <td class="column-actions">
-                            <a href="<?php echo admin_url(\'admin.php?page=eto-participants&action=view&id=\' . $participant->id); ?>" class="button button-small"><?php _e(\'Visualizza\', \'eto\'); ?></a>
+                            <a href="<?php echo admin_url(\'admin.php?page=eto-view-participant&id=\' . $participant->id); ?>" class="button button-small"><?php _e(\'Visualizza\', \'eto\'); ?></a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -359,6 +460,233 @@ if (!defined(\'ABSPATH\')) exit;
         $participants = array(); // Array vuoto predefinito
         
         include($participants_file);
+    }
+    
+    /**
+     * Renderizza la pagina di aggiunta di un nuovo partecipante
+     */
+    public function render_add_participant_page() {
+        // Crea la directory per i partecipanti se non esiste
+        $participants_dir = plugin_dir_path(dirname(__FILE__)) . 'admin/views/participants';
+        if (!file_exists($participants_dir)) {
+            mkdir($participants_dir, 0755, true);
+        }
+        
+        // Crea il file add.php se non esiste
+        $add_participant_file = $participants_dir . '/add.php';
+        if (!file_exists($add_participant_file)) {
+            $content = '<?php
+/**
+ * Vista per l\'aggiunta di un nuovo partecipante
+ * 
+ * @package ETO
+ * @subpackage Views
+ * @since 2.5.3
+ */
+
+// Impedisci l\'accesso diretto
+if (!defined(\'ABSPATH\')) exit;
+?>
+
+<div class="wrap">
+    <h1><?php _e(\'Aggiungi Nuovo Partecipante\', \'eto\'); ?></h1>
+    
+    <div id="eto-messages"></div>
+    
+    <form id="eto-add-participant-form" class="eto-form">
+        <div class="eto-form-section">
+            <h2><?php _e(\'Informazioni Generali\', \'eto\'); ?></h2>
+            
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="participant-name"><?php _e(\'Nome\', \'eto\'); ?> <span class="required">*</span></label>
+                    </th>
+                    <td>
+                        <input type="text" id="participant-name" name="name" class="regular-text" required>
+                        <p class="description"><?php _e(\'Il nome del partecipante.\', \'eto\'); ?></p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="participant-email"><?php _e(\'Email\', \'eto\'); ?> <span class="required">*</span></label>
+                    </th>
+                    <td>
+                        <input type="email" id="participant-email" name="email" class="regular-text" required>
+                        <p class="description"><?php _e(\'L\\\'indirizzo email del partecipante.\', \'eto\'); ?></p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="participant-team"><?php _e(\'Team\', \'eto\'); ?> <span class="required">*</span></label>
+                    </th>
+                    <td>
+                        <select id="participant-team" name="team_id" required>
+                            <option value=""><?php _e(\'Seleziona un team\', \'eto\'); ?></option>
+                            <?php 
+                            $teams = $this->db_query->get_teams();
+                            foreach ($teams as $team) : 
+                            ?>
+                                <option value="<?php echo esc_attr($team[\'id\']); ?>"><?php echo esc_html($team[\'name\']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description"><?php _e(\'Il team a cui appartiene il partecipante.\', \'eto\'); ?></p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="eto-form-section">
+            <h2><?php _e(\'Tornei\', \'eto\'); ?></h2>
+            
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="participant-tournaments"><?php _e(\'Tornei\', \'eto\'); ?></label>
+                    </th>
+                    <td>
+                        <div class="tournaments-list">
+                            <?php 
+                            $tournaments = $this->db_query->get_tournaments();
+                            foreach ($tournaments as $tournament) : 
+                            ?>
+                                <label>
+                                    <input type="checkbox" name="tournaments[]" value="<?php echo esc_attr($tournament[\'id\']); ?>">
+                                    <?php echo esc_html($tournament[\'name\']); ?>
+                                </label><br>
+                            <?php endforeach; ?>
+                        </div>
+                        <p class="description"><?php _e(\'Seleziona i tornei a cui il partecipante è iscritto.\', \'eto\'); ?></p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="eto-form-section">
+            <h2><?php _e(\'Informazioni Aggiuntive\', \'eto\'); ?></h2>
+            
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="participant-role"><?php _e(\'Ruolo\', \'eto\'); ?></label>
+                    </th>
+                    <td>
+                        <input type="text" id="participant-role" name="role" class="regular-text">
+                        <p class="description"><?php _e(\'Il ruolo del partecipante nel team.\', \'eto\'); ?></p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="participant-notes"><?php _e(\'Note\', \'eto\'); ?></label>
+                    </th>
+                    <td>
+                        <textarea id="participant-notes" name="notes" rows="5" cols="50" class="large-text"></textarea>
+                        <p class="description"><?php _e(\'Note aggiuntive sul partecipante.\', \'eto\'); ?></p>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        
+        <p class="submit">
+            <input type="hidden" name="action" value="eto_add_participant">
+            <input type="hidden" name="eto_nonce" value="<?php echo wp_create_nonce(\'eto_add_participant\'); ?>">
+            <button type="submit" class="button button-primary"><?php _e(\'Aggiungi Partecipante\', \'eto\'); ?></button>
+            <a href="<?php echo admin_url(\'admin.php?page=eto-participants\'); ?>" class="button"><?php _e(\'Annulla\', \'eto\'); ?></a>
+        </p>
+    </form>
+</div>
+
+<script type="text/javascript">
+jQuery(document).ready(function($) {
+    // Gestione invio form
+    $(\'#eto-add-participant-form\').on(\'submit\', function(e) {
+        e.preventDefault();
+        
+        // Validazione
+        var name = $(\'#participant-name\').val();
+        var email = $(\'#participant-email\').val();
+        var team = $(\'#participant-team\').val();
+        
+        var errors = [];
+        
+        if (!name) {
+            errors.push(\'<?php _e("Il nome è obbligatorio.", "eto"); ?>\');
+            $(\'#participant-name\').addClass(\'eto-field-error\');
+        } else {
+            $(\'#participant-name\').removeClass(\'eto-field-error\');
+        }
+        
+        if (!email) {
+            errors.push(\'<?php _e("L\'email è obbligatoria.", "eto"); ?>\');
+            $(\'#participant-email\').addClass(\'eto-field-error\');
+        } else {
+            $(\'#participant-email\').removeClass(\'eto-field-error\');
+        }
+        
+        if (!team) {
+            errors.push(\'<?php _e("Il team è obbligatorio.", "eto"); ?>\');
+            $(\'#participant-team\').addClass(\'eto-field-error\');
+        } else {
+            $(\'#participant-team\').removeClass(\'eto-field-error\');
+        }
+        
+        if (errors.length > 0) {
+            var errorHtml = \'<div class="notice notice-error"><p><strong><?php _e("Errori:", "eto"); ?></strong></p><ul>\';
+            
+            $.each(errors, function(index, error) {
+                errorHtml += \'<li>\' + error + \'</li>\';
+            });
+            
+            errorHtml += \'</ul></div>\';
+            
+            $(\'#eto-messages\').html(errorHtml);
+            $(\'html, body\').animate({ scrollTop: 0 }, \'slow\');
+            return;
+        }
+        
+        // Invio dati
+        $.ajax({
+            url: ajaxurl,
+            type: \'POST\',
+            data: $(this).serialize(),
+            beforeSend: function() {
+                $(\'#eto-messages\').html(\'<div class="notice notice-info"><p><?php _e("Invio in corso...", "eto"); ?></p></div>\');
+            },
+            success: function(response) {
+                if (response.success) {
+                    $(\'#eto-messages\').html(\'<div class="notice notice-success"><p>\' + response.data.message + \'</p></div>\');
+                    
+                    // Reindirizza alla lista dei partecipanti
+                    if (response.data.redirect) {
+                        setTimeout(function() {
+                            window.location.href = response.data.redirect;
+                        }, 1000);
+                    }
+                } else {
+                    $(\'#eto-messages\').html(\'<div class="notice notice-error"><p>\' + response.data.message + \'</p></div>\');
+                }
+                
+                $(\'html, body\').animate({ scrollTop: 0 }, \'slow\');
+            },
+            error: function() {
+                $(\'#eto-messages\').html(\'<div class="notice notice-error"><p><?php _e("Si è verificato un errore durante l\'invio dei dati.", "eto"); ?></p></div>\');
+                $(\'html, body\').animate({ scrollTop: 0 }, \'slow\');
+            }
+        });
+    });
+});
+</script>';
+            file_put_contents($add_participant_file, $content);
+        }
+        
+        // Inizializza le variabili necessarie per la vista
+        $teams = $this->db_query->get_teams();
+        $tournaments = $this->db_query->get_tournaments();
+        
+        include($add_participant_file);
     }
     
     /**
@@ -856,7 +1184,7 @@ if (!defined(\'ABSPATH\')) exit;
      */
     public function ajax_add_participant() {
         // Verifica il nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'eto-admin-nonce')) {
+        if (!isset($_POST['eto_nonce']) || !wp_verify_nonce($_POST['eto_nonce'], 'eto_add_participant')) {
             wp_send_json_error(array('message' => __('Errore di sicurezza', 'eto')));
         }
         
@@ -866,24 +1194,36 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i campi obbligatori
-        if (empty($_POST['tournament_id']) || empty($_POST['team_id'])) {
+        if (empty($_POST['name']) || empty($_POST['email']) || empty($_POST['team_id'])) {
             wp_send_json_error(array('message' => __('Tutti i campi obbligatori devono essere compilati', 'eto')));
         }
         
         // Sanitizza i dati
         $participant_data = array(
-            'tournament_id' => intval($_POST['tournament_id']),
+            'name' => sanitize_text_field($_POST['name']),
+            'email' => sanitize_email($_POST['email']),
             'team_id' => intval($_POST['team_id']),
-            'status' => 'confirmed',
+            'role' => isset($_POST['role']) ? sanitize_text_field($_POST['role']) : '',
+            'notes' => isset($_POST['notes']) ? sanitize_textarea_field($_POST['notes']) : '',
             'created_by' => get_current_user_id(),
             'created_at' => current_time('mysql')
         );
         
         // Inserisci il partecipante nel database
-        $result = $this->db_query->add_participant($participant_data);
+        $result = $this->db_query->insert_participant($participant_data);
         
         if ($result) {
-            wp_send_json_success(array('message' => __('Partecipante aggiunto con successo', 'eto')));
+            // Aggiungi il partecipante ai tornei selezionati
+            if (isset($_POST['tournaments']) && is_array($_POST['tournaments'])) {
+                foreach ($_POST['tournaments'] as $tournament_id) {
+                    $this->db_query->add_participant_to_tournament($result, intval($tournament_id));
+                }
+            }
+            
+            wp_send_json_success(array(
+                'message' => __('Partecipante aggiunto con successo', 'eto'),
+                'redirect' => admin_url('admin.php?page=eto-participants')
+            ));
         } else {
             wp_send_json_error(array('message' => __('Errore durante l\'aggiunta del partecipante', 'eto')));
         }
@@ -903,13 +1243,13 @@ if (!defined(\'ABSPATH\')) exit;
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
-        // Verifica i campi obbligatori
-        if (empty($_POST['tournament_id']) || empty($_POST['team_id'])) {
-            wp_send_json_error(array('message' => __('Tutti i campi obbligatori devono essere compilati', 'eto')));
+        // Verifica l'ID del partecipante
+        if (empty($_POST['id'])) {
+            wp_send_json_error(array('message' => __('ID partecipante mancante', 'eto')));
         }
         
-        // Rimuovi il partecipante dal database
-        $result = $this->db_query->remove_participant(intval($_POST['tournament_id']), intval($_POST['team_id']));
+        // Elimina il partecipante dal database
+        $result = $this->db_query->delete_participant(intval($_POST['id']));
         
         if ($result) {
             wp_send_json_success(array('message' => __('Partecipante rimosso con successo', 'eto')));
