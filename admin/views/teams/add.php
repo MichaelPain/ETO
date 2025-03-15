@@ -172,6 +172,14 @@ if (!defined('ABSPATH')) exit;
 
 <script type="text/javascript">
 jQuery(document).ready(function($) {
+    console.log('Form di aggiunta team inizializzato');
+    
+    // Definizione esplicita di ajaxurl
+    if (typeof ajaxurl === 'undefined') {
+        var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+    }
+    console.log('ajaxurl:', ajaxurl);
+    
     // Gestione caricamento logo
     $('#upload-logo-button').on('click', function(e) {
         e.preventDefault();
@@ -196,6 +204,7 @@ jQuery(document).ready(function($) {
     // Gestione invio form
     $('#eto-add-team-form').on('submit', function(e) {
         e.preventDefault();
+        console.log('Form di aggiunta team inviato');
         
         // Validazione
         var name = $('#team-name').val();
@@ -241,19 +250,21 @@ jQuery(document).ready(function($) {
         
         // Invio dati
         $.ajax({
-            url: ajaxurl,
+            url: '<?php echo admin_url('admin-ajax.php'); ?>',
             type: 'POST',
             data: $(this).serialize(),
             beforeSend: function() {
                 $('#eto-messages').html('<div class="notice notice-info"><p><?php _e('Creazione del team in corso...', 'eto'); ?></p></div>');
             },
             success: function(response) {
+                console.log('Risposta ricevuta:', response);
+                
                 if (response.success) {
                     $('#eto-messages').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
                     
-                    // Reindirizza alla pagina di modifica
+                    // Reindirizza alla pagina dei team
                     setTimeout(function() {
-                        window.location.href = '<?php echo admin_url('admin.php?page=eto-edit-team&id='); ?>' + response.data.team_id;
+                        window.location.href = '<?php echo admin_url('admin.php?page=eto-teams'); ?>';
                     }, 1000);
                 } else {
                     var errorHtml = '<div class="notice notice-error"><p>' + response.data.message + '</p>';
@@ -275,7 +286,8 @@ jQuery(document).ready(function($) {
                     $('html, body').animate({ scrollTop: 0 }, 'slow');
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.error('Errore AJAX:', xhr, status, error);
                 $('#eto-messages').html('<div class="notice notice-error"><p><?php _e('Si è verificato un errore durante l\'elaborazione della richiesta.', 'eto'); ?></p></div>');
                 $('html, body').animate({ scrollTop: 0 }, 'slow');
             }

@@ -194,6 +194,14 @@ if (!defined('ABSPATH')) exit;
 
 <script type="text/javascript">
 jQuery(document).ready(function($) {
+    console.log('Form di aggiunta torneo inizializzato');
+    
+    // Definizione esplicita di ajaxurl
+    if (typeof ajaxurl === 'undefined') {
+        var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+    }
+    console.log('ajaxurl:', ajaxurl);
+    
     // Gestione caricamento immagine
     $('#upload-image-button').on('click', function(e) {
         e.preventDefault();
@@ -239,10 +247,10 @@ jQuery(document).ready(function($) {
         return errors;
     }
     
-    // Validazione numeri team
+    // Validazione team
     function validateTeams() {
-        var minTeams = parseInt($('#tournament-min-teams').val(), 10);
-        var maxTeams = parseInt($('#tournament-max-teams').val(), 10);
+        var minTeams = parseInt($('#tournament-min-teams').val());
+        var maxTeams = parseInt($('#tournament-max-teams').val());
         
         var errors = [];
         
@@ -260,6 +268,7 @@ jQuery(document).ready(function($) {
     // Gestione invio form
     $('#eto-add-tournament-form').on('submit', function(e) {
         e.preventDefault();
+        console.log('Form di aggiunta torneo inviato');
         
         // Validazione
         var dateErrors = validateDates();
@@ -282,19 +291,21 @@ jQuery(document).ready(function($) {
         
         // Invio dati
         $.ajax({
-            url: ajaxurl,
+            url: '<?php echo admin_url('admin-ajax.php'); ?>',
             type: 'POST',
             data: $(this).serialize(),
             beforeSend: function() {
                 $('#eto-messages').html('<div class="notice notice-info"><p><?php _e('Creazione del torneo in corso...', 'eto'); ?></p></div>');
             },
             success: function(response) {
+                console.log('Risposta ricevuta:', response);
+                
                 if (response.success) {
                     $('#eto-messages').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
                     
-                    // Reindirizza alla pagina di modifica
+                    // Reindirizza alla pagina dei tornei
                     setTimeout(function() {
-                        window.location.href = '<?php echo admin_url('admin.php?page=eto-edit-tournament&id='); ?>' + response.data.tournament_id;
+                        window.location.href = '<?php echo admin_url('admin.php?page=eto-tournaments'); ?>';
                     }, 1000);
                 } else {
                     var errorHtml = '<div class="notice notice-error"><p>' + response.data.message + '</p>';
@@ -316,7 +327,8 @@ jQuery(document).ready(function($) {
                     $('html, body').animate({ scrollTop: 0 }, 'slow');
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.error('Errore AJAX:', xhr, status, error);
                 $('#eto-messages').html('<div class="notice notice-error"><p><?php _e('Si è verificato un errore durante l\'elaborazione della richiesta.', 'eto'); ?></p></div>');
                 $('html, body').animate({ scrollTop: 0 }, 'slow');
             }

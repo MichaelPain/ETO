@@ -166,8 +166,20 @@ class ETO_Admin_Controller {
         wp_enqueue_media();
         
         // Script
-        wp_enqueue_script('eto-admin', plugin_dir_url(dirname(__FILE__)) . 'admin/js/admin-fixed.js', ['jquery'], ETO_VERSION, true);
-        
+// Rimuoviamo il riferimento al file JavaScript esterno
+// wp_enqueue_script('eto-admin', plugin_dir_url(dirname(__FILE__)) . 'admin/js/admin-fixed.js', ['jquery'], ETO_VERSION, true);
+
+// Localizzazione
+wp_localize_script('jquery', 'etoAdmin', [
+    'ajaxurl' => admin_url('admin-ajax.php'),
+    'nonce' => wp_create_nonce('eto-admin-nonce'),
+    'i18n' => [
+        'confirmDelete' => __('Sei sicuro di voler eliminare questo elemento?', 'eto'),
+        'confirmReset' => __('Sei sicuro di voler resettare questo torneo? Tutti i dati saranno persi.', 'eto'),
+        'confirmStart' => __('Sei sicuro di voler avviare questo torneo? Non sarà più possibile aggiungere partecipanti.', 'eto')
+    ]
+]);        
+
         // Localizzazione
         wp_localize_script('eto-admin', 'etoAdmin', [
             'ajaxurl' => admin_url('admin-ajax.php'),
