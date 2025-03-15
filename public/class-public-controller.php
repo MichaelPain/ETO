@@ -5,7 +5,7 @@
  * Gestisce le funzionalità frontend del plugin
  * 
  * @package ETO
- * @since 2.5.0
+ * @since 2.5.3
  */
 
 // Impedisci l'accesso diretto
@@ -32,7 +32,14 @@ class ETO_Public_Controller {
      */
     public function __construct() {
         $this->db_query = new ETO_DB_Query();
-        
+    }
+    
+    /**
+     * Inizializza il controller
+     * 
+     * Questo metodo è stato aggiunto per compatibilità con il file principale
+     */
+    public function init() {
         // Inizializza le azioni e i filtri
         $this->init_hooks();
     }
@@ -59,10 +66,10 @@ class ETO_Public_Controller {
      */
     public function register_scripts() {
         // Stili
-        wp_enqueue_style('eto-public', ETO_PLUGIN_URL . 'public/css/public.css', array(), ETO_VERSION);
+        wp_enqueue_style('eto-public', plugin_dir_url(dirname(__FILE__)) . 'public/css/public.css', array(), ETO_VERSION);
         
         // Script
-        wp_enqueue_script('eto-public', ETO_PLUGIN_URL . 'public/js/public.js', array('jquery'), ETO_VERSION, true);
+        wp_enqueue_script('eto-public', plugin_dir_url(dirname(__FILE__)) . 'public/js/public.js', array('jquery'), ETO_VERSION, true);
         
         // Localizzazione
         wp_localize_script('eto-public', 'etoPublic', array(
@@ -89,27 +96,27 @@ class ETO_Public_Controller {
         // Verifica se è una pagina di torneo
         if (isset($wp_query->query_vars['post_type']) && $wp_query->query_vars['post_type'] === 'eto-tournament') {
             if (is_single()) {
-                $template = ETO_PLUGIN_DIR . 'templates/single-tournament.php';
+                $template = ETO_PLUGIN_DIR . '/templates/frontend/tournaments/tournament-view.php';
             } elseif (is_archive()) {
-                $template = ETO_PLUGIN_DIR . 'templates/archive-tournament.php';
+                $template = ETO_PLUGIN_DIR . '/templates/frontend/tournaments/tournament-list.php';
             }
         }
         
         // Verifica se è una pagina di team
         if (isset($wp_query->query_vars['post_type']) && $wp_query->query_vars['post_type'] === 'eto-team') {
             if (is_single()) {
-                $template = ETO_PLUGIN_DIR . 'templates/single-team.php';
+                $template = ETO_PLUGIN_DIR . '/templates/frontend/teams/team-view.php';
             } elseif (is_archive()) {
-                $template = ETO_PLUGIN_DIR . 'templates/archive-team.php';
+                $template = ETO_PLUGIN_DIR . '/templates/frontend/teams/team-list.php';
             }
         }
         
         // Verifica se è una pagina di match
         if (isset($wp_query->query_vars['post_type']) && $wp_query->query_vars['post_type'] === 'eto-match') {
             if (is_single()) {
-                $template = ETO_PLUGIN_DIR . 'templates/single-match.php';
+                $template = ETO_PLUGIN_DIR . '/templates/frontend/matches/match-view.php';
             } elseif (is_archive()) {
-                $template = ETO_PLUGIN_DIR . 'templates/archive-match.php';
+                $template = ETO_PLUGIN_DIR . '/templates/frontend/matches/match-list.php';
             }
         }
         
