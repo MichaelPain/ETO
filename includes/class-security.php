@@ -283,7 +283,7 @@ class ETO_Security_Enhanced extends ETO_Security {
  * @package ETO
  * @since 2.5.0
  */
-class ETO_DB_Query_Secure {
+class ETO_Security_DB_Query {
     
     /**
      * Costruttore

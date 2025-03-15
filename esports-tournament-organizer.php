@@ -37,8 +37,8 @@ $required_perms = array(
     )
 );
 
-// Funzione migliorata per la verifica dei permessi
-function eto_check_permissions() {
+// Funzione migliorata per la verifica e l'impostazione forzata dei permessi
+function eto_check_permissions($force_set = false) {
     global $required_perms;
     $issues_found = false;
     
@@ -63,24 +63,39 @@ function eto_check_permissions() {
                 }
             }
             
-            $current_perm = fileperms($path) & 0777;
-            if ($current_perm != $expected_perm) {
-                // Tenta di correggere i permessi
+            // Imposta i permessi in modo forzato durante l'attivazione
+            if ($force_set) {
+                // Usa metodi alternativi per impostare i permessi
                 @chmod($path, $expected_perm);
                 
-                // Verifica se la correzione ha avuto successo
+                // Prova con il comando shell se disponibile e se siamo in ambiente Linux/Unix
+                if (function_exists('exec') && !in_array('exec', explode(',', ini_get('disable_functions'))) && (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN')) {
+                    @exec('chmod ' . decoct($expected_perm) . ' ' . escapeshellarg($path) . ' 2>&1', $output, $return_var);
+                }
+                
+                // Registra l'operazione
+                error_log("[ETO] Impostati permessi directory: " . $path . " a " . decoct($expected_perm));
+            } else {
+                // Comportamento normale di verifica
                 $current_perm = fileperms($path) & 0777;
                 if ($current_perm != $expected_perm) {
-                    eto_add_admin_notice(
-                        'error',
-                        sprintf(
-                            __('Permessi directory errati: %s. Attuale: %o, Richiesto: %o', 'eto'),
-                            esc_html($path),
-                            $current_perm,
-                            $expected_perm
-                        )
-                    );
-                    $issues_found = true;
+                    // Tenta di correggere i permessi
+                    @chmod($path, $expected_perm);
+                    
+                    // Verifica se la correzione ha avuto successo
+                    $current_perm = fileperms($path) & 0777;
+                    if ($current_perm != $expected_perm) {
+                        eto_add_admin_notice(
+                            'error',
+                            sprintf(
+                                __('Permessi directory errati: %s. Attuale: %o, Richiesto: %o', 'eto'),
+                                esc_html($path),
+                                $current_perm,
+                                $expected_perm
+                            )
+                        );
+                        $issues_found = true;
+                    }
                 }
             }
         }
@@ -111,24 +126,39 @@ function eto_check_permissions() {
                 }
             }
             
-            $current_perm = fileperms($file) & 0777;
-            if ($current_perm != $expected_perm) {
-                // Tenta di correggere i permessi
+            // Imposta i permessi in modo forzato durante l'attivazione
+            if ($force_set) {
+                // Usa metodi alternativi per impostare i permessi
                 @chmod($file, $expected_perm);
                 
-                // Verifica se la correzione ha avuto successo
+                // Prova con il comando shell se disponibile e se siamo in ambiente Linux/Unix
+                if (function_exists('exec') && !in_array('exec', explode(',', ini_get('disable_functions'))) && (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN')) {
+                    @exec('chmod ' . decoct($expected_perm) . ' ' . escapeshellarg($file) . ' 2>&1', $output, $return_var);
+                }
+                
+                // Registra l'operazione
+                error_log("[ETO] Impostati permessi file: " . $file . " a " . decoct($expected_perm));
+            } else {
+                // Comportamento normale di verifica
                 $current_perm = fileperms($file) & 0777;
                 if ($current_perm != $expected_perm) {
-                    eto_add_admin_notice(
-                        'error',
-                        sprintf(
-                            __('Permessi file errati: %s. Attuale: %o, Richiesto: %o', 'eto'),
-                            esc_html($file),
-                            $current_perm,
-                            $expected_perm
-                        )
-                    );
-                    $issues_found = true;
+                    // Tenta di correggere i permessi
+                    @chmod($file, $expected_perm);
+                    
+                    // Verifica se la correzione ha avuto successo
+                    $current_perm = fileperms($file) & 0777;
+                    if ($current_perm != $expected_perm) {
+                        eto_add_admin_notice(
+                            'error',
+                            sprintf(
+                                __('Permessi file errati: %s. Attuale: %o, Richiesto: %o', 'eto'),
+                                esc_html($file),
+                                $current_perm,
+                                $expected_perm
+                            )
+                        );
+                        $issues_found = true;
+                    }
                 }
             }
         }
@@ -142,6 +172,7 @@ global $core_files;
 $core_files = array(
     'includes/config.php',
     'includes/utilities.php',  // Carica utilities.php prima di class-db-query-secure.php
+    'includes/class-db-query.php',  // Carica class-db-query.php prima di class-db-query-secure.php
     'includes/class-db-query-secure.php'
 );
 
@@ -326,8 +357,8 @@ function eto_activate() {
     wp_mkdir_p(ETO_PLUGIN_DIR . '/templates/frontend/matches');
     wp_mkdir_p(ETO_PLUGIN_DIR . '/templates/frontend/users');
     
-    // Imposta i permessi
-    eto_check_permissions();
+    // Imposta i permessi in modo forzato durante l'attivazione
+    eto_check_permissions(true);
     
     // Crea/aggiorna le tabelle del database
     if (file_exists(ETO_PLUGIN_DIR . '/includes/class-database-manager.php')) {
@@ -350,12 +381,15 @@ function eto_deactivate() {
 // Disinstallazione
 // La logica di disinstallazione è in uninstall.php
 
+// Caricamento traduzioni (spostato da plugins_loaded a init per risolvere il problema di caricamento anticipato)
+add_action('init', 'eto_load_textdomain');
+function eto_load_textdomain() {
+    load_plugin_textdomain('eto', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+
 // Inizializzazione
 add_action('plugins_loaded', 'eto_init');
 function eto_init() {
-    // Carica il dominio di traduzione
-    load_plugin_textdomain('eto', false, dirname(plugin_basename(__FILE__)) . '/languages');
-    
     // Verifica permessi
     eto_check_permissions();
     

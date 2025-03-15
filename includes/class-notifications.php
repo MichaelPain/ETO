@@ -304,7 +304,7 @@ Cordiali saluti,
 
 Il torneo "%s" a cui il tuo team "%s" è registrato inizierà tra 24 ore.
 
-Ricordati di effettuare il check-in prima dell'inizio del torneo:
+Ricordati di effettuare il check-in prima dell\'inizio del torneo:
 %s
 
 Per visualizzare i dettagli completi del torneo, visita:

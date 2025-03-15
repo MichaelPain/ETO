@@ -750,9 +750,9 @@ class ETO_DB_Query_Secure {
 
 /**
  * Funzione helper per ottenere un'istanza della classe di query
+ * Questa funzione è già definita in utilities.php, quindi è stata rimossa da qui
+ * per evitare errori di duplicazione.
  *
- * @return ETO_DB_Query_Secure Istanza della classe di query
+ * @see utilities.php
  */
-function eto_db_query_secure() {
-    return new ETO_DB_Query_Secure();
-}
+// function eto_db_query_secure() rimossa per evitare duplicazione
