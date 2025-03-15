@@ -715,10 +715,10 @@ Cordiali saluti,
 
 Il check-in per il torneo "%s" è ora aperto.
 
-Per partecipare al torneo, è necessario effettuare il check-in prima dell'inizio:
+Per partecipare al torneo, è necessario effettuare il check-in prima dell\'inizio:
 %s
 
-Il check-in si chiuderà 15 minuti prima dell'inizio del torneo.
+Il check-in si chiuderà 15 minuti prima dell\'inizio del torneo.
 
 Cordiali saluti,
 %s', 'eto'),
@@ -776,10 +776,10 @@ Cordiali saluti,
 
 PROMEMORIA: Non hai ancora effettuato il check-in per il torneo "%s" che inizierà a breve.
 
-Per partecipare al torneo, è necessario effettuare il check-in prima dell'inizio:
+Per partecipare al torneo, è necessario effettuare il check-in prima dell\'inizio:
 %s
 
-Il check-in si chiuderà 15 minuti prima dell'inizio del torneo.
+Il check-in si chiuderà 15 minuti prima dell\'inizio del torneo.
 
 Cordiali saluti,
 %s', 'eto'),

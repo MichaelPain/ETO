@@ -47,7 +47,7 @@ class ETO_Checkin {
         }
         
         if (class_exists('ETO_Notifications')) {
-            $this->notifications = new ETO_Notifications();
+            $this->notifications = ETO_Notifications::get_instance();
         }
     }
     

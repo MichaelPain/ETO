@@ -28,6 +28,17 @@ class ETO_DB_Query {
     }
     
     /**
+     * Ottiene il nome completo di una tabella del database
+     *
+     * @param string $table Nome della tabella senza prefisso
+     * @return string Nome completo della tabella con prefisso
+     */
+    public function get_table_name($table) {
+        global $wpdb;
+        return $wpdb->prefix . 'eto_' . $table;
+    }
+    
+    /**
      * Ottiene un singolo torneo dal database
      *
      * @param int $tournament_id ID del torneo
