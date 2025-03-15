@@ -162,8 +162,11 @@ class ETO_Admin_Controller {
         // Stili
         wp_enqueue_style('eto-admin', plugin_dir_url(dirname(__FILE__)) . 'admin/css/admin.css', [], ETO_VERSION);
         
+        // Media Uploader
+        wp_enqueue_media();
+        
         // Script
-        wp_enqueue_script('eto-admin', plugin_dir_url(dirname(__FILE__)) . 'admin/js/admin.js', ['jquery'], ETO_VERSION, true);
+        wp_enqueue_script('eto-admin', plugin_dir_url(dirname(__FILE__)) . 'admin/js/admin-fixed.js', ['jquery'], ETO_VERSION, true);
         
         // Localizzazione
         wp_localize_script('eto-admin', 'etoAdmin', [
@@ -597,88 +600,7 @@ if (!defined(\'ABSPATH\')) exit;
             <a href="<?php echo admin_url(\'admin.php?page=eto-participants\'); ?>" class="button"><?php _e(\'Annulla\', \'eto\'); ?></a>
         </p>
     </form>
-</div>
-
-<script type="text/javascript">
-jQuery(document).ready(function($) {
-    // Gestione invio form
-    $(\'#eto-add-participant-form\').on(\'submit\', function(e) {
-        e.preventDefault();
-        
-        // Validazione
-        var name = $(\'#participant-name\').val();
-        var email = $(\'#participant-email\').val();
-        var team = $(\'#participant-team\').val();
-        
-        var errors = [];
-        
-        if (!name) {
-            errors.push(\'<?php _e("Il nome è obbligatorio.", "eto"); ?>\');
-            $(\'#participant-name\').addClass(\'eto-field-error\');
-        } else {
-            $(\'#participant-name\').removeClass(\'eto-field-error\');
-        }
-        
-        if (!email) {
-            errors.push(\'<?php _e("L\'email è obbligatoria.", "eto"); ?>\');
-            $(\'#participant-email\').addClass(\'eto-field-error\');
-        } else {
-            $(\'#participant-email\').removeClass(\'eto-field-error\');
-        }
-        
-        if (!team) {
-            errors.push(\'<?php _e("Il team è obbligatorio.", "eto"); ?>\');
-            $(\'#participant-team\').addClass(\'eto-field-error\');
-        } else {
-            $(\'#participant-team\').removeClass(\'eto-field-error\');
-        }
-        
-        if (errors.length > 0) {
-            var errorHtml = \'<div class="notice notice-error"><p><strong><?php _e("Errori:", "eto"); ?></strong></p><ul>\';
-            
-            $.each(errors, function(index, error) {
-                errorHtml += \'<li>\' + error + \'</li>\';
-            });
-            
-            errorHtml += \'</ul></div>\';
-            
-            $(\'#eto-messages\').html(errorHtml);
-            $(\'html, body\').animate({ scrollTop: 0 }, \'slow\');
-            return;
-        }
-        
-        // Invio dati
-        $.ajax({
-            url: ajaxurl,
-            type: \'POST\',
-            data: $(this).serialize(),
-            beforeSend: function() {
-                $(\'#eto-messages\').html(\'<div class="notice notice-info"><p><?php _e("Invio in corso...", "eto"); ?></p></div>\');
-            },
-            success: function(response) {
-                if (response.success) {
-                    $(\'#eto-messages\').html(\'<div class="notice notice-success"><p>\' + response.data.message + \'</p></div>\');
-                    
-                    // Reindirizza alla lista dei partecipanti
-                    if (response.data.redirect) {
-                        setTimeout(function() {
-                            window.location.href = response.data.redirect;
-                        }, 1000);
-                    }
-                } else {
-                    $(\'#eto-messages\').html(\'<div class="notice notice-error"><p>\' + response.data.message + \'</p></div>\');
-                }
-                
-                $(\'html, body\').animate({ scrollTop: 0 }, \'slow\');
-            },
-            error: function() {
-                $(\'#eto-messages\').html(\'<div class="notice notice-error"><p><?php _e("Si è verificato un errore durante l\'invio dei dati.", "eto"); ?></p></div>\');
-                $(\'html, body\').animate({ scrollTop: 0 }, \'slow\');
-            }
-        });
-    });
-});
-</script>';
+</div>';
             file_put_contents($add_participant_file, $content);
         }
         
@@ -903,6 +825,7 @@ if (!defined(\'ABSPATH\')) exit;
         if ($result) {
             wp_send_json_success(array(
                 'message' => __('Torneo creato con successo', 'eto'),
+                'tournament_id' => $result,
                 'redirect' => admin_url('admin.php?page=eto-tournaments')
             ));
         } else {
@@ -1092,6 +1015,7 @@ if (!defined(\'ABSPATH\')) exit;
         if ($result) {
             wp_send_json_success(array(
                 'message' => __('Team creato con successo', 'eto'),
+                'team_id' => $result,
                 'redirect' => admin_url('admin.php?page=eto-teams')
             ));
         } else {
