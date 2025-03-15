@@ -203,6 +203,12 @@ class ETO_Admin_Controller {
      * Renderizza la pagina dei tornei
      */
     public function render_tournaments_page() {
+        // Inizializza le variabili necessarie per la vista
+        $total_pages = 1;
+        $total_tournaments = 0;
+        $page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+        $tournaments = array(); // Array vuoto predefinito
+        
         include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/tournaments/list.php');
     }
     
@@ -210,6 +216,12 @@ class ETO_Admin_Controller {
      * Renderizza la pagina dei team
      */
     public function render_teams_page() {
+        // Inizializza le variabili necessarie per la vista
+        $games = $this->get_available_games();
+        
+        // Imposta un valore predefinito per total_pages
+        $total_pages = 1;
+        
         include(plugin_dir_path(dirname(__FILE__)) . 'admin/views/teams/list.php');
     }
     
@@ -330,5 +342,46 @@ class ETO_Admin_Controller {
      */
     public function ajax_remove_participant() {
         // Implementazione dell'handler
+    }
+    
+    /**
+     * Ottiene i giochi disponibili per i tornei
+     * @return array Lista dei giochi disponibili
+     */
+    public function get_available_games() {
+        // Array predefinito di giochi supportati
+        $games = array(
+            'lol' => 'League of Legends',
+            'dota2' => 'Dota 2',
+            'csgo' => 'CS:GO',
+            'valorant' => 'Valorant',
+            'fortnite' => 'Fortnite',
+            'pubg' => 'PUBG',
+            'rocketleague' => 'Rocket League',
+            'overwatch' => 'Overwatch',
+            'fifa' => 'FIFA',
+            'other' => 'Altro'
+        );
+        
+        // Filtro per permettere l'aggiunta di giochi personalizzati
+        return apply_filters('eto_available_games', $games);
+    }
+    
+    /**
+     * Ottiene i formati di torneo disponibili
+     * @return array Lista dei formati disponibili
+     */
+    public function get_available_formats() {
+        // Array predefinito di formati supportati
+        $formats = array(
+            'single_elimination' => 'Eliminazione diretta',
+            'double_elimination' => 'Doppia eliminazione',
+            'round_robin' => 'Girone all\'italiana',
+            'swiss' => 'Sistema svizzero',
+            'custom' => 'Personalizzato'
+        );
+        
+        // Filtro per permettere l'aggiunta di formati personalizzati
+        return apply_filters('eto_available_formats', $formats);
     }
 }
