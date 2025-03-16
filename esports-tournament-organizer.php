@@ -29,7 +29,8 @@ require_once ETO_PLUGIN_DIR . 'eto-widgets.php';
 // Includi il gestore AJAX
 require_once ETO_PLUGIN_DIR . 'eto-ajax-handler.php';
 
-// Includi i file delle classi principali
+// Includi i file delle classi principali (in ordine di dipendenza)
+require_once ETO_PLUGIN_DIR . 'includes/class-database-manager.php';
 require_once ETO_PLUGIN_DIR . 'includes/class-db-query.php';
 
 // Includi i file di amministrazione
@@ -42,6 +43,25 @@ register_activation_hook(__FILE__, 'eto_activate');
 
 // Disattivazione del plugin
 register_deactivation_hook(__FILE__, 'eto_deactivate');
+
+/**
+ * Crea le tabelle del database utilizzando la classe ETO_Database_Manager
+ * 
+ * @since 2.5.4
+ * @return void
+ */
+function eto_create_tables() {
+    // Istanzia la classe Database Manager
+    $db_manager = new ETO_Database_Manager();
+    
+    // Chiama il metodo per creare le tabelle
+    $db_manager->create_tables();
+    
+    // Crea anche la tabella dei log se necessario
+    if (class_exists('ETO_Logger')) {
+        ETO_Logger::create_table();
+    }
+}
 
 // Funzione di attivazione
 function eto_activate() {
