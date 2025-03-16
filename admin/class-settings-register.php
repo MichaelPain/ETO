@@ -62,8 +62,8 @@ class ETO_Settings_Register {
         // Registra le impostazioni
         add_action('admin_init', array($this, 'register_settings'));
         
-        // Commentiamo questa riga per evitare menu duplicati
-        // add_action('admin_menu', array($this, 'add_admin_pages'));
+        // Ripristiniamo questa riga per avere la dashboard e le impostazioni avanzate
+        add_action('admin_menu', array($this, 'add_admin_pages'));
     }
     
     /**

@@ -32,8 +32,8 @@ class ETO_Admin_Controller {
      * Inizializza il controller
      */
     public function init() {
-        // Aggiungi le pagine di amministrazione
-        add_action('admin_menu', [$this, 'register_admin_menu']);
+        // Commentiamo questa riga per evitare menu duplicati con class-settings-register.php
+        // add_action('admin_menu', [$this, 'register_admin_menu']);
         
         // Registra gli script e gli stili
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);

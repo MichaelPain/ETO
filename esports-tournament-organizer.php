@@ -113,10 +113,10 @@ add_action('wp_enqueue_scripts', 'eto_enqueue_scripts');
 // Aggiungi gli script e gli stili di amministrazione
 function eto_admin_enqueue_scripts() {
     // Stili
-    wp_enqueue_style('eto-admin-style', ETO_PLUGIN_URL . 'admin/assets/css/eto-admin.css', array(), ETO_VERSION);
+    wp_enqueue_style('eto-admin-style', ETO_PLUGIN_URL . 'admin/css/admin.css', array(), ETO_VERSION);
     
     // Script
-    wp_enqueue_script('eto-admin-script', ETO_PLUGIN_URL . 'admin/assets/js/eto-admin.js', array('jquery'), ETO_VERSION, true);
+    wp_enqueue_script('eto-admin-script', ETO_PLUGIN_URL . 'admin/js/admin.js', array('jquery'), ETO_VERSION, true);
     
     // Localizza lo script
     wp_localize_script('eto-admin-script', 'etoAdmin', array(
