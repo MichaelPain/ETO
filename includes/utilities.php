@@ -86,26 +86,8 @@ function eto_log($message, $level = 'info') {
     }
 }
 
-/**
- * Formatta una data nel formato locale
- * 
- * @param string $date Data in formato MySQL
- * @param bool $include_time Se includere anche l'ora
- * @return string Data formattata
- */
-function eto_format_date($date, $include_time = true) {
-    if (empty($date)) {
-        return '';
-    }
-    
-    $format = get_option('date_format');
-    
-    if ($include_time) {
-        $format .= ' ' . get_option('time_format');
-    }
-    
-    return date_i18n($format, strtotime($date));
-}
+// Rimuovo la funzione eto_format_date() per evitare il conflitto con quella in eto-functions.php
+// La funzione originale è stata spostata in eto-functions.php
 
 /**
  * Verifica se un utente è un amministratore del torneo
