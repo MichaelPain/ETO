@@ -22,6 +22,40 @@ class ETO_Settings_Register {
     }
     
     /**
+     * Ottiene i giochi disponibili
+     * 
+     * @return array Array associativo di giochi disponibili
+     */
+    public function get_available_games() {
+        return array(
+            'lol' => __('League of Legends', 'eto'),
+            'dota2' => __('Dota 2', 'eto'),
+            'csgo' => __('CS:GO', 'eto'),
+            'valorant' => __('Valorant', 'eto'),
+            'fortnite' => __('Fortnite', 'eto'),
+            'overwatch' => __('Overwatch', 'eto'),
+            'rocketleague' => __('Rocket League', 'eto'),
+            'fifa' => __('FIFA', 'eto'),
+            'other' => __('Altro', 'eto')
+        );
+    }
+    
+    /**
+     * Ottiene i formati disponibili
+     * 
+     * @return array Array associativo di formati disponibili
+     */
+    public function get_available_formats() {
+        return array(
+            'single_elimination' => __('Eliminazione Diretta', 'eto'),
+            'double_elimination' => __('Doppia Eliminazione', 'eto'),
+            'round_robin' => __('Round Robin', 'eto'),
+            'swiss' => __('Sistema Svizzero', 'eto'),
+            'group_stage' => __('Fase a Gironi', 'eto')
+        );
+    }
+    
+    /**
      * Inizializza le azioni e i filtri
      */
     private function init_hooks() {

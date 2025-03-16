@@ -32,53 +32,8 @@ function eto_admin_init() {
 
 // Aggiungi il menu di amministrazione
 function eto_admin_menu() {
-    // Menu principale
-    add_menu_page(
-        __('ETO - Gestione Tornei', 'eto'),
-        __('ETO Tornei', 'eto'),
-        'manage_options',
-        'eto-tournaments',
-        array('ETO_Admin_Controller', 'render_tournaments_page'),
-        'dashicons-awards',
-        30
-    );
-    
-    // Sottopagine
-    add_submenu_page(
-        'eto-tournaments',
-        __('Tornei', 'eto'),
-        __('Tornei', 'eto'),
-        'manage_options',
-        'eto-tournaments',
-        array('ETO_Admin_Controller', 'render_tournaments_page')
-    );
-    
-    add_submenu_page(
-        'eto-tournaments',
-        __('Team', 'eto'),
-        __('Team', 'eto'),
-        'manage_options',
-        'eto-teams',
-        array('ETO_Admin_Controller', 'render_teams_page')
-    );
-    
-    add_submenu_page(
-        'eto-tournaments',
-        __('Partecipanti', 'eto'),
-        __('Partecipanti', 'eto'),
-        'manage_options',
-        'eto-participants',
-        array('ETO_Admin_Controller', 'render_participants_page')
-    );
-    
-    add_submenu_page(
-        'eto-tournaments',
-        __('Impostazioni', 'eto'),
-        __('Impostazioni', 'eto'),
-        'manage_options',
-        'eto-settings',
-        array('ETO_Admin_Controller', 'render_settings_page')
-    );
+    // Menu principale rimosso per evitare duplicazione con quello in class-settings-register.php
+    // Il menu principale è ora gestito solo dalla classe ETO_Settings_Register
 }
 
 // Inizializza l'amministrazione

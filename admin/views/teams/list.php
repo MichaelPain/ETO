@@ -9,6 +9,13 @@
 
 // Impedisci l'accesso diretto
 if (!defined('ABSPATH')) exit;
+
+// Inizializza le variabili necessarie
+$games = $this->get_available_games();
+$page = isset($_GET['paged']) ? absint($_GET['paged']) : 1;
+$per_page = 20;
+$total_teams = 0; // Questo dovrebbe essere ottenuto dal database
+$total_pages = ceil($total_teams / $per_page);
 ?>
 
 <div class="wrap">
