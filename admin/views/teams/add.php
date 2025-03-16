@@ -8,7 +8,8 @@
  */
 
 // Verifica che l'utente sia loggato e abbia i permessi necessari
-if (!current_user_can('manage_options')) {
+// Modificato per consentire l'accesso a più ruoli
+if (!current_user_can('edit_posts')) {
     wp_die(__('Non hai i permessi necessari per accedere a questa pagina.', 'eto'));
 }
 

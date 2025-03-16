@@ -51,8 +51,8 @@ class ETO_Team_Controller {
      * Inizializza il controller
      */
     public function init() {
-        // Aggiungi le azioni per le pagine di amministrazione
-        add_action('admin_menu', [$this, 'register_admin_menu']);
+        // Commentiamo questa riga per evitare menu duplicati
+        // add_action('admin_menu', [$this, 'register_admin_menu']);
         
         // Registra gli AJAX handler
         $this->register_ajax_handlers();
@@ -295,67 +295,68 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Errore di sicurezza: token di verifica non valido.', 'eto')]);
         }
         
-        // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        // Verifica i permessi - Modificato per consentire l'accesso a più ruoli
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'eto')]);
         }
         
         // Ottieni i dati del form
         $name = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : '';
-        $description = isset($_POST['description']) ? sanitize_textarea_field($_POST['description']) : '';
+        $description = isset($_POST['description']) ? wp_kses_post($_POST['description']) : '';
         $game = isset($_POST['game']) ? sanitize_text_field($_POST['game']) : '';
-        $logo_url = isset($_POST['logo_url']) ? esc_url_raw($_POST['logo_url']) : '';
         $captain_id = isset($_POST['captain_id']) ? intval($_POST['captain_id']) : 0;
+        $logo_url = isset($_POST['logo_url']) ? esc_url_raw($_POST['logo_url']) : '';
+        $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
+        $website = isset($_POST['website']) ? esc_url_raw($_POST['website']) : '';
+        $social_media = isset($_POST['social_media']) ? $_POST['social_media'] : [];
+        
+        // Sanitizza i social media
+        $sanitized_social_media = [];
+        foreach ($social_media as $key => $value) {
+            $sanitized_social_media[$key] = sanitize_text_field($value);
+        }
         
         // Valida i dati
-        $errors = [];
-        
         if (empty($name)) {
-            $errors['name'] = __('Il nome del team è obbligatorio.', 'eto');
+            wp_send_json_error(['message' => __('Il nome del team è obbligatorio.', 'eto')]);
         }
         
         if (empty($game)) {
-            $errors['game'] = __('Il gioco è obbligatorio.', 'eto');
+            wp_send_json_error(['message' => __('Il gioco è obbligatorio.', 'eto')]);
         }
         
         if (empty($captain_id)) {
-            $errors['captain_id'] = __('Il capitano è obbligatorio.', 'eto');
-        }
-        
-        if (!empty($errors)) {
-            wp_send_json_error(['message' => __('Errore nella validazione dei dati.', 'eto'), 'errors' => $errors]);
+            wp_send_json_error(['message' => __('Il capitano è obbligatorio.', 'eto')]);
         }
         
         // Crea il team
-        $team = new ETO_Team_Model();
-        $team->set('name', $name);
-        $team->set('description', $description);
-        $team->set('game', $game);
-        $team->set('logo_url', $logo_url);
-        $team->set('captain_id', $captain_id);
-        $team->set('created_by', get_current_user_id());
+        $team_data = [
+            'name' => $name,
+            'description' => $description,
+            'game' => $game,
+            'captain_id' => $captain_id,
+            'logo_url' => $logo_url,
+            'email' => $email,
+            'website' => $website,
+            'social_media' => maybe_serialize($sanitized_social_media),
+            'created_by' => get_current_user_id(),
+            'created_at' => current_time('mysql')
+        ];
         
-        $team_id = $team->save();
+        $team_id = ETO_Team_Model::create($team_data);
         
         if (!$team_id) {
-            wp_send_json_error(['message' => __('Errore nella creazione del team.', 'eto')]);
+            wp_send_json_error(['message' => __('Errore durante la creazione del team.', 'eto')]);
         }
         
         // Aggiungi il capitano come membro
-        $team->add_member($captain_id, 'captain');
+        ETO_Team_Model::add_member($team_id, $captain_id, 'captain');
         
-        // Registra l'azione nell'audit log
-        if (class_exists('ETO_Audit_Log')) {
-            ETO_Audit_Log::log(
-                'team_created',
-                sprintf(__('Team "%s" creato', 'eto'), $name),
-                ['team_id' => $team_id]
-            );
-        }
-        
+        // Invia la risposta
         wp_send_json_success([
             'message' => __('Team creato con successo.', 'eto'),
-            'team_id' => $team_id
+            'team_id' => $team_id,
+            'redirect' => admin_url('admin.php?page=eto-teams')
         ]);
     }
     
@@ -368,8 +369,8 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Errore di sicurezza: token di verifica non valido.', 'eto')]);
         }
         
-        // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        // Verifica i permessi - Modificato per consentire l'accesso a più ruoli
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'eto')]);
         }
         
@@ -387,51 +388,65 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Team non trovato.', 'eto')]);
         }
         
+        // Verifica i permessi specifici
+        $user_id = get_current_user_id();
+        if ($team->get('captain_id') != $user_id && $team->get('created_by') != $user_id && !current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Non hai i permessi per modificare questo team.', 'eto')]);
+        }
+        
         // Ottieni i dati del form
         $name = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : '';
-        $description = isset($_POST['description']) ? sanitize_textarea_field($_POST['description']) : '';
+        $description = isset($_POST['description']) ? wp_kses_post($_POST['description']) : '';
         $game = isset($_POST['game']) ? sanitize_text_field($_POST['game']) : '';
+        $captain_id = isset($_POST['captain_id']) ? intval($_POST['captain_id']) : 0;
         $logo_url = isset($_POST['logo_url']) ? esc_url_raw($_POST['logo_url']) : '';
+        $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
+        $website = isset($_POST['website']) ? esc_url_raw($_POST['website']) : '';
+        $social_media = isset($_POST['social_media']) ? $_POST['social_media'] : [];
+        
+        // Sanitizza i social media
+        $sanitized_social_media = [];
+        foreach ($social_media as $key => $value) {
+            $sanitized_social_media[$key] = sanitize_text_field($value);
+        }
         
         // Valida i dati
-        $errors = [];
-        
         if (empty($name)) {
-            $errors['name'] = __('Il nome del team è obbligatorio.', 'eto');
+            wp_send_json_error(['message' => __('Il nome del team è obbligatorio.', 'eto')]);
         }
         
         if (empty($game)) {
-            $errors['game'] = __('Il gioco è obbligatorio.', 'eto');
+            wp_send_json_error(['message' => __('Il gioco è obbligatorio.', 'eto')]);
         }
         
-        if (!empty($errors)) {
-            wp_send_json_error(['message' => __('Errore nella validazione dei dati.', 'eto'), 'errors' => $errors]);
+        if (empty($captain_id)) {
+            wp_send_json_error(['message' => __('Il capitano è obbligatorio.', 'eto')]);
         }
         
         // Aggiorna il team
-        $team->set('name', $name);
-        $team->set('description', $description);
-        $team->set('game', $game);
-        $team->set('logo_url', $logo_url);
+        $team_data = [
+            'name' => $name,
+            'description' => $description,
+            'game' => $game,
+            'captain_id' => $captain_id,
+            'logo_url' => $logo_url,
+            'email' => $email,
+            'website' => $website,
+            'social_media' => maybe_serialize($sanitized_social_media),
+            'updated_at' => current_time('mysql')
+        ];
         
-        $result = $team->save();
+        $result = ETO_Team_Model::update($team_id, $team_data);
         
         if (!$result) {
-            wp_send_json_error(['message' => __('Errore nell\'aggiornamento del team.', 'eto')]);
+            wp_send_json_error(['message' => __('Errore durante l\'aggiornamento del team.', 'eto')]);
         }
         
-        // Registra l'azione nell'audit log
-        if (class_exists('ETO_Audit_Log')) {
-            ETO_Audit_Log::log(
-                'team_updated',
-                sprintf(__('Team "%s" aggiornato', 'eto'), $name),
-                ['team_id' => $team_id]
-            );
-        }
-        
+        // Invia la risposta
         wp_send_json_success([
             'message' => __('Team aggiornato con successo.', 'eto'),
-            'team_id' => $team_id
+            'team_id' => $team_id,
+            'redirect' => admin_url('admin.php?page=eto-teams')
         ]);
     }
     
@@ -444,8 +459,8 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Errore di sicurezza: token di verifica non valido.', 'eto')]);
         }
         
-        // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        // Verifica i permessi - Modificato per consentire l'accesso a più ruoli
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'eto')]);
         }
         
@@ -463,24 +478,23 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Team non trovato.', 'eto')]);
         }
         
+        // Verifica i permessi specifici
+        $user_id = get_current_user_id();
+        if ($team->get('captain_id') != $user_id && $team->get('created_by') != $user_id && !current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Non hai i permessi per eliminare questo team.', 'eto')]);
+        }
+        
         // Elimina il team
-        $result = $team->delete();
+        $result = ETO_Team_Model::delete($team_id);
         
         if (!$result) {
-            wp_send_json_error(['message' => __('Errore nell\'eliminazione del team.', 'eto')]);
+            wp_send_json_error(['message' => __('Errore durante l\'eliminazione del team.', 'eto')]);
         }
         
-        // Registra l'azione nell'audit log
-        if (class_exists('ETO_Audit_Log')) {
-            ETO_Audit_Log::log(
-                'team_deleted',
-                sprintf(__('Team ID %d eliminato', 'eto'), $team_id),
-                ['team_id' => $team_id]
-            );
-        }
-        
+        // Invia la risposta
         wp_send_json_success([
-            'message' => __('Team eliminato con successo.', 'eto')
+            'message' => __('Team eliminato con successo.', 'eto'),
+            'redirect' => admin_url('admin.php?page=eto-teams')
         ]);
     }
     
@@ -493,8 +507,8 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Errore di sicurezza: token di verifica non valido.', 'eto')]);
         }
         
-        // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        // Verifica i permessi - Modificato per consentire l'accesso a più ruoli
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'eto')]);
         }
         
@@ -512,19 +526,9 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Team non trovato.', 'eto')]);
         }
         
-        // Ottieni i dati del team
-        $team_data = $team->get_data();
-        
-        // Ottieni i membri
-        $members = $team->get_members();
-        
-        // Ottieni i tornei
-        $tournaments = $team->get_tournaments();
-        
+        // Invia la risposta
         wp_send_json_success([
-            'team' => $team_data,
-            'members' => $members,
-            'tournaments' => $tournaments
+            'team' => $team->to_array()
         ]);
     }
     
@@ -537,27 +541,23 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Errore di sicurezza: token di verifica non valido.', 'eto')]);
         }
         
-        // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        // Verifica i permessi - Modificato per consentire l'accesso a più ruoli
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'eto')]);
         }
         
-        // Ottieni l'ID del team
+        // Ottieni i dati
         $team_id = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
+        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+        $role = isset($_POST['role']) ? sanitize_text_field($_POST['role']) : 'member';
         
         if (empty($team_id)) {
             wp_send_json_error(['message' => __('ID team non valido.', 'eto')]);
         }
         
-        // Ottieni l'ID dell'utente
-        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
-        
         if (empty($user_id)) {
             wp_send_json_error(['message' => __('ID utente non valido.', 'eto')]);
         }
-        
-        // Ottieni il ruolo
-        $role = isset($_POST['role']) ? sanitize_text_field($_POST['role']) : 'member';
         
         // Ottieni il team
         $team = ETO_Team_Model::get_by_id($team_id);
@@ -566,47 +566,27 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Team non trovato.', 'eto')]);
         }
         
+        // Verifica i permessi specifici
+        $current_user_id = get_current_user_id();
+        if ($team->get('captain_id') != $current_user_id && $team->get('created_by') != $current_user_id && !current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Non hai i permessi per aggiungere membri a questo team.', 'eto')]);
+        }
+        
         // Verifica se l'utente è già membro
         if ($team->is_member($user_id)) {
-            wp_send_json_error(['message' => __('L\'utente è già membro del team.', 'eto')]);
+            wp_send_json_error(['message' => __('L\'utente è già membro di questo team.', 'eto')]);
         }
         
         // Aggiungi il membro
-        $result = $team->add_member($user_id, $role);
+        $result = ETO_Team_Model::add_member($team_id, $user_id, $role);
         
         if (!$result) {
-            wp_send_json_error(['message' => __('Errore nell\'aggiunta del membro.', 'eto')]);
+            wp_send_json_error(['message' => __('Errore durante l\'aggiunta del membro.', 'eto')]);
         }
         
-        // Ottieni i dati dell'utente
-        $user = ETO_User_Model::get_by_id($user_id);
-        
-        if (!$user) {
-            wp_send_json_error(['message' => __('Utente non trovato.', 'eto')]);
-        }
-        
-        $user_data = $user->get_data();
-        
-        // Registra l'azione nell'audit log
-        if (class_exists('ETO_Audit_Log')) {
-            ETO_Audit_Log::log(
-                'team_member_added',
-                sprintf(__('Utente "%s" aggiunto al team ID %d con ruolo "%s"', 'eto'), $user_data['display_name'], $team_id, $role),
-                [
-                    'team_id' => $team_id,
-                    'user_id' => $user_id,
-                    'role' => $role
-                ]
-            );
-        }
-        
+        // Invia la risposta
         wp_send_json_success([
-            'message' => __('Membro aggiunto con successo.', 'eto'),
-            'member' => [
-                'user_id' => $user_id,
-                'display_name' => $user_data['display_name'],
-                'role' => $role
-            ]
+            'message' => __('Membro aggiunto con successo.', 'eto')
         ]);
     }
     
@@ -619,20 +599,18 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Errore di sicurezza: token di verifica non valido.', 'eto')]);
         }
         
-        // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        // Verifica i permessi - Modificato per consentire l'accesso a più ruoli
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'eto')]);
         }
         
-        // Ottieni l'ID del team
+        // Ottieni i dati
         $team_id = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
+        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
         
         if (empty($team_id)) {
             wp_send_json_error(['message' => __('ID team non valido.', 'eto')]);
         }
-        
-        // Ottieni l'ID dell'utente
-        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
         
         if (empty($user_id)) {
             wp_send_json_error(['message' => __('ID utente non valido.', 'eto')]);
@@ -645,35 +623,25 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Team non trovato.', 'eto')]);
         }
         
-        // Verifica se l'utente è membro
-        if (!$team->is_member($user_id)) {
-            wp_send_json_error(['message' => __('L\'utente non è membro del team.', 'eto')]);
+        // Verifica i permessi specifici
+        $current_user_id = get_current_user_id();
+        if ($team->get('captain_id') != $current_user_id && $team->get('created_by') != $current_user_id && !current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Non hai i permessi per rimuovere membri da questo team.', 'eto')]);
         }
         
         // Verifica se l'utente è il capitano
         if ($team->get('captain_id') == $user_id) {
-            wp_send_json_error(['message' => __('Non puoi rimuovere il capitano. Promuovi prima un altro membro a capitano.', 'eto')]);
+            wp_send_json_error(['message' => __('Non puoi rimuovere il capitano dal team.', 'eto')]);
         }
         
         // Rimuovi il membro
-        $result = $team->remove_member($user_id);
+        $result = ETO_Team_Model::remove_member($team_id, $user_id);
         
         if (!$result) {
-            wp_send_json_error(['message' => __('Errore nella rimozione del membro.', 'eto')]);
+            wp_send_json_error(['message' => __('Errore durante la rimozione del membro.', 'eto')]);
         }
         
-        // Registra l'azione nell'audit log
-        if (class_exists('ETO_Audit_Log')) {
-            ETO_Audit_Log::log(
-                'team_member_removed',
-                sprintf(__('Utente ID %d rimosso dal team ID %d', 'eto'), $user_id, $team_id),
-                [
-                    'team_id' => $team_id,
-                    'user_id' => $user_id
-                ]
-            );
-        }
-        
+        // Invia la risposta
         wp_send_json_success([
             'message' => __('Membro rimosso con successo.', 'eto')
         ]);
@@ -688,20 +656,18 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Errore di sicurezza: token di verifica non valido.', 'eto')]);
         }
         
-        // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        // Verifica i permessi - Modificato per consentire l'accesso a più ruoli
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'eto')]);
         }
         
-        // Ottieni l'ID del team
+        // Ottieni i dati
         $team_id = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
+        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
         
         if (empty($team_id)) {
             wp_send_json_error(['message' => __('ID team non valido.', 'eto')]);
         }
-        
-        // Ottieni l'ID dell'utente
-        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
         
         if (empty($user_id)) {
             wp_send_json_error(['message' => __('ID utente non valido.', 'eto')]);
@@ -714,48 +680,36 @@ class ETO_Team_Controller {
             wp_send_json_error(['message' => __('Team non trovato.', 'eto')]);
         }
         
-        // Verifica se l'utente è membro
-        if (!$team->is_member($user_id)) {
-            wp_send_json_error(['message' => __('L\'utente non è membro del team.', 'eto')]);
+        // Verifica i permessi specifici
+        $current_user_id = get_current_user_id();
+        if ($team->get('captain_id') != $current_user_id && $team->get('created_by') != $current_user_id && !current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Non hai i permessi per promuovere membri in questo team.', 'eto')]);
         }
-        
-        // Ottieni il capitano attuale
-        $current_captain_id = $team->get('captain_id');
         
         // Verifica se l'utente è già il capitano
-        if ($current_captain_id == $user_id) {
-            wp_send_json_error(['message' => __('L\'utente è già il capitano del team.', 'eto')]);
+        if ($team->get('captain_id') == $user_id) {
+            wp_send_json_error(['message' => __('L\'utente è già il capitano di questo team.', 'eto')]);
         }
         
-        // Aggiorna il ruolo del membro attuale
-        $team->update_member_role($user_id, 'captain');
-        
-        // Aggiorna il ruolo del capitano precedente
-        if ($current_captain_id > 0) {
-            $team->update_member_role($current_captain_id, 'member');
+        // Verifica se l'utente è membro
+        if (!$team->is_member($user_id)) {
+            wp_send_json_error(['message' => __('L\'utente non è membro di questo team.', 'eto')]);
         }
         
-        // Aggiorna il capitano del team
-        $team->set('captain_id', $user_id);
-        $result = $team->save();
+        // Aggiorna il capitano
+        $result = ETO_Team_Model::update($team_id, ['captain_id' => $user_id]);
         
         if (!$result) {
-            wp_send_json_error(['message' => __('Errore nella promozione del membro.', 'eto')]);
+            wp_send_json_error(['message' => __('Errore durante la promozione del membro.', 'eto')]);
         }
         
-        // Registra l'azione nell'audit log
-        if (class_exists('ETO_Audit_Log')) {
-            ETO_Audit_Log::log(
-                'team_captain_changed',
-                sprintf(__('Utente ID %d promosso a capitano del team ID %d', 'eto'), $user_id, $team_id),
-                [
-                    'team_id' => $team_id,
-                    'user_id' => $user_id,
-                    'previous_captain_id' => $current_captain_id
-                ]
-            );
-        }
+        // Aggiorna il ruolo del membro
+        ETO_Team_Model::update_member_role($team_id, $user_id, 'captain');
         
+        // Aggiorna il ruolo del vecchio capitano
+        ETO_Team_Model::update_member_role($team_id, $team->get('captain_id'), 'member');
+        
+        // Invia la risposta
         wp_send_json_success([
             'message' => __('Membro promosso a capitano con successo.', 'eto')
         ]);
@@ -763,24 +717,21 @@ class ETO_Team_Controller {
     
     /**
      * Ottiene i giochi disponibili
-     *
-     * @return array Array di giochi
+     * 
+     * @return array Array associativo di giochi disponibili
      */
     private function get_available_games() {
         return [
             'lol' => __('League of Legends', 'eto'),
-            'valorant' => __('Valorant', 'eto'),
-            'csgo' => __('Counter-Strike: Global Offensive', 'eto'),
             'dota2' => __('Dota 2', 'eto'),
-            'overwatch' => __('Overwatch', 'eto'),
+            'csgo' => __('CS:GO', 'eto'),
+            'valorant' => __('Valorant', 'eto'),
             'fortnite' => __('Fortnite', 'eto'),
             'pubg' => __('PUBG', 'eto'),
             'rocketleague' => __('Rocket League', 'eto'),
-            'hearthstone' => __('Hearthstone', 'eto'),
+            'overwatch' => __('Overwatch', 'eto'),
+            'fifa' => __('FIFA', 'eto'),
             'other' => __('Altro', 'eto')
         ];
     }
 }
-
-// Inizializza il controller
-$team_controller = new ETO_Team_Controller();
