@@ -38,7 +38,7 @@ $plugin_url = plugin_dir_url(dirname(dirname(__FILE__)));
     
     <div id="eto-messages"></div>
     
-<form id="eto-add-team-form" class="eto-form" method="post" action="<?php echo admin_url('admin-post.php'); ?>">
+<form id="eto-add-team-form" class="eto-form" method="post" action="<?php echo site_url('wp-admin/admin-post.php'); ?>">
         <input type="hidden" name="action" value="eto_create_team">
         <input type="hidden" name="eto_nonce" value="<?php echo wp_create_nonce('eto_create_team'); ?>">
         

@@ -25,6 +25,20 @@ $team_page = get_option('eto_team_page', 0);
 
 // Ottieni tutte le pagine
 $pages = get_pages();
+
+// Registra le opzioni
+function eto_register_settings() {
+    // Registra le opzioni eto_settings
+    register_setting('eto_settings', 'eto_default_format');
+    register_setting('eto_settings', 'eto_default_game');
+    register_setting('eto_settings', 'eto_max_teams_per_tournament');
+    register_setting('eto_settings', 'eto_enable_third_place_match');
+    register_setting('eto_settings', 'eto_riot_api_key');
+    register_setting('eto_settings', 'eto_enable_riot_api');
+    register_setting('eto_settings', 'eto_tournament_page');
+    register_setting('eto_settings', 'eto_team_page');
+}
+add_action('admin_init', 'eto_register_settings');
 ?>
 
 <div class="wrap">
@@ -34,27 +48,9 @@ $pages = get_pages();
     
     <form method="post" action="options.php">
         <?php
-        // Registra le opzioni eto_settings
-        register_setting('eto_settings', 'eto_default_format');
-        register_setting('eto_settings', 'eto_default_game');
-        register_setting('eto_settings', 'eto_max_teams_per_tournament');
-        register_setting('eto_settings', 'eto_enable_third_place_match');
-        register_setting('eto_settings', 'eto_riot_api_key');
-        register_setting('eto_settings', 'eto_enable_riot_api');
-        register_setting('eto_settings', 'eto_tournament_page');
-        register_setting('eto_settings', 'eto_team_page');
-        
-        // Aggiungi eto_settings alla whitelist
-        add_option('eto_settings');
-        
- // Registra le opzioni eto_settings
-    settings_fields('eto_settings');
-    do_settings_sections('eto-settings');
-    
-    // Aggiungi un campo nascosto per forzare l'aggiornamento
-    echo '<input type="hidden" name="eto_settings_updated" value="1">';
-    
-    submit_button(__('Salva Impostazioni', 'eto'));
+        // Output dei campi nascosti necessari per WordPress
+        settings_fields('eto_settings');
+        do_settings_sections('eto-settings');
         ?>
         
         <div class="eto-settings-container">
