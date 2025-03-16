@@ -119,9 +119,12 @@ function eto_admin_enqueue_scripts() {
     wp_enqueue_script('eto-admin-script', ETO_PLUGIN_URL . 'admin/assets/js/eto-admin.js', array('jquery'), ETO_VERSION, true);
     
     // Localizza lo script
-    wp_localize_script('eto-admin-script', 'eto_admin_vars', array(
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('eto-admin-nonce')
+    wp_localize_script('eto-admin-script', 'etoAdmin', array(
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('eto-admin-nonce'),
+        'i18n' => array(
+            'confirmDelete' => __('Sei sicuro di voler eliminare questo elemento? Questa azione non può essere annullata.', 'eto')
+        )
     ));
     
     // Media Uploader

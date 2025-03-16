@@ -8,7 +8,7 @@
 jQuery(document).ready(function($) {
     // Definizione esplicita di ajaxurl se non è già definito
     if (typeof ajaxurl === 'undefined') {
-        var ajaxurl = '/wp-admin/admin-ajax.php';
+        var ajaxurl = etoAdmin.ajaxurl || '/wp-admin/admin-ajax.php';
     }
     
     console.log('ETO Admin JS caricato');

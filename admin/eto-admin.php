@@ -39,5 +39,5 @@ function eto_admin_menu() {
 // Inizializza l'amministrazione
 eto_admin_init();
 
-// Aggiungi il menu di amministrazione
-add_action('admin_menu', 'eto_admin_menu');
+// Rimuoviamo la registrazione del menu per evitare duplicazioni
+// add_action('admin_menu', 'eto_admin_menu');

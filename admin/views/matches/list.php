@@ -9,6 +9,14 @@
 
 // Impedisci l'accesso diretto
 if (!defined('ABSPATH')) exit;
+
+// Inizializza le variabili necessarie
+$tournaments = array(); // Questo dovrebbe essere ottenuto dal database
+$matches = array(); // Questo dovrebbe essere ottenuto dal database
+$page = isset($_GET['paged']) ? absint($_GET['paged']) : 1;
+$per_page = 20;
+$total_matches = 0; // Questo dovrebbe essere ottenuto dal database
+$total_pages = ceil($total_matches / $per_page);
 ?>
 
 <div class="wrap">
