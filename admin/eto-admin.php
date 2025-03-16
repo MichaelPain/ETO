@@ -24,10 +24,9 @@ function eto_admin_init() {
     $admin_controller = new ETO_Admin_Controller();
     $admin_controller->init();
     
-    // Inizializza le impostazioni
-    $settings = new ETO_Settings_Register();
-    // Non chiamiamo il metodo init() perché non esiste nella classe ETO_Settings_Register
-    // La classe ETO_Settings_Register chiama già init_hooks() nel costruttore
+    // NON creiamo una nuova istanza di ETO_Settings_Register qui
+    // perché viene già istanziata nel suo file di classe
+    // $settings = new ETO_Settings_Register();
 }
 
 // Aggiungi il menu di amministrazione

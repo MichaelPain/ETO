@@ -59,7 +59,7 @@ class ETO_Admin_Controller {
         add_menu_page(
             __('ETO - Gestione Tornei', 'eto'),
             __('ETO Tornei', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-tournaments',
             [$this, 'render_tournaments_page'],
             'dashicons-awards',
@@ -71,7 +71,7 @@ class ETO_Admin_Controller {
             'eto-tournaments',
             __('Tornei', 'eto'),
             __('Tornei', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-tournaments',
             [$this, 'render_tournaments_page']
         );
@@ -80,7 +80,7 @@ class ETO_Admin_Controller {
             'eto-tournaments',
             __('Team', 'eto'),
             __('Team', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-teams',
             [$this, 'render_teams_page']
         );
@@ -89,7 +89,7 @@ class ETO_Admin_Controller {
             'eto-tournaments',
             __('Partecipanti', 'eto'),
             __('Partecipanti', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-participants',
             [$this, 'render_participants_page']
         );
@@ -98,7 +98,7 @@ class ETO_Admin_Controller {
             'eto-tournaments',
             __('Impostazioni', 'eto'),
             __('Impostazioni', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-settings',
             [$this, 'render_settings_page']
         );
@@ -108,7 +108,7 @@ class ETO_Admin_Controller {
             null,
             __('Aggiungi Torneo', 'eto'),
             __('Aggiungi Torneo', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-add-tournament',
             [$this, 'render_add_tournament_page']
         );
@@ -117,7 +117,7 @@ class ETO_Admin_Controller {
             null,
             __('Modifica Torneo', 'eto'),
             __('Modifica Torneo', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-edit-tournament',
             [$this, 'render_edit_tournament_page']
         );
@@ -126,7 +126,7 @@ class ETO_Admin_Controller {
             null,
             __('Aggiungi Team', 'eto'),
             __('Aggiungi Team', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-add-team',
             [$this, 'render_add_team_page']
         );
@@ -135,7 +135,7 @@ class ETO_Admin_Controller {
             null,
             __('Modifica Team', 'eto'),
             __('Modifica Team', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-edit-team',
             [$this, 'render_edit_team_page']
         );
@@ -144,7 +144,7 @@ class ETO_Admin_Controller {
             null,
             __('Aggiungi Partecipante', 'eto'),
             __('Aggiungi Partecipante', 'eto'),
-            'manage_options',
+            'edit_posts',
             'eto-add-participant',
             [$this, 'render_add_participant_page']
         );
@@ -802,7 +802,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
@@ -855,7 +855,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
@@ -911,7 +911,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
@@ -940,7 +940,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
@@ -969,7 +969,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
@@ -998,7 +998,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
@@ -1045,7 +1045,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
@@ -1096,7 +1096,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
@@ -1125,7 +1125,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         
@@ -1175,7 +1175,7 @@ if (!defined(\'ABSPATH\')) exit;
         }
         
         // Verifica i permessi
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error(array('message' => __('Non hai i permessi necessari', 'eto')));
         }
         

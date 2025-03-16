@@ -32,6 +32,7 @@ require_once ETO_PLUGIN_DIR . 'eto-ajax-handler.php';
 // Includi i file delle classi principali (in ordine di dipendenza)
 require_once ETO_PLUGIN_DIR . 'includes/class-database-manager.php';
 require_once ETO_PLUGIN_DIR . 'includes/class-db-query.php';
+require_once ETO_PLUGIN_DIR . 'includes/utilities.php'; // Aggiunto per risolvere il problema delle funzioni non definite
 
 // Includi i file di amministrazione
 if (is_admin()) {
