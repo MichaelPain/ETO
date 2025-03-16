@@ -1,10 +1,10 @@
 <?php
 /**
  * Template per la pagina di aggiunta team
- * Versione modificata per utilizzare il processore di form diretto
+ * Versione modificata per utilizzare AJAX
  * 
  * @package ETO
- * @since 2.5.3
+ * @since 2.5.4
  */
 
 // Verifica che l'utente sia loggato e abbia i permessi necessari
@@ -38,7 +38,7 @@ $plugin_url = plugin_dir_url(dirname(dirname(__FILE__)));
     
     <div id="eto-messages"></div>
     
-<form id="eto-add-team-form" class="eto-form" method="post" action="<?php echo site_url('wp-admin/admin-post.php'); ?>">
+    <form id="eto-add-team-form" class="eto-form" method="post">
         <input type="hidden" name="action" value="eto_create_team">
         <input type="hidden" name="eto_nonce" value="<?php echo wp_create_nonce('eto_create_team'); ?>">
         
@@ -153,6 +153,49 @@ jQuery(document).ready(function($) {
         });
         
         custom_uploader.open();
+    });
+    
+    // Gestione invio form tramite AJAX
+    $('#eto-add-team-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Mostra messaggio di caricamento
+        $('#eto-messages').html('<div class="notice notice-info"><p>Creazione team in corso...</p></div>');
+        
+        // Ottieni i dati del form
+        var formData = new FormData(this);
+        
+        // Aggiungi il contenuto dell'editor
+        if (typeof tinyMCE !== 'undefined' && tinyMCE.get('description') !== null) {
+            formData.set('description', tinyMCE.get('description').getContent());
+        }
+        
+        // Invia la richiesta AJAX
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    // Mostra messaggio di successo
+                    $('#eto-messages').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
+                    
+                    // Reindirizza dopo un breve ritardo
+                    setTimeout(function() {
+                        window.location.href = response.data.redirect;
+                    }, 1000);
+                } else {
+                    // Mostra messaggio di errore
+                    $('#eto-messages').html('<div class="notice notice-error"><p>Errore: ' + response.data + '</p></div>');
+                }
+            },
+            error: function(xhr, status, error) {
+                // Mostra messaggio di errore
+                $('#eto-messages').html('<div class="notice notice-error"><p>Errore durante la richiesta: ' + error + '</p></div>');
+            }
+        });
     });
 });
 </script>

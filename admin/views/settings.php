@@ -1,9 +1,10 @@
 <?php
 /**
  * Template per la pagina delle impostazioni
+ * Versione modificata per utilizzare AJAX
  * 
  * @package ETO
- * @since 2.5.3
+ * @since 2.5.4
  */
 
 // Verifica che l'utente sia loggato e abbia i permessi necessari
@@ -25,33 +26,16 @@ $team_page = get_option('eto_team_page', 0);
 
 // Ottieni tutte le pagine
 $pages = get_pages();
-
-// Registra le opzioni
-function eto_register_settings() {
-    // Registra le opzioni eto_settings
-    register_setting('eto_settings', 'eto_default_format');
-    register_setting('eto_settings', 'eto_default_game');
-    register_setting('eto_settings', 'eto_max_teams_per_tournament');
-    register_setting('eto_settings', 'eto_enable_third_place_match');
-    register_setting('eto_settings', 'eto_riot_api_key');
-    register_setting('eto_settings', 'eto_enable_riot_api');
-    register_setting('eto_settings', 'eto_tournament_page');
-    register_setting('eto_settings', 'eto_team_page');
-}
-add_action('admin_init', 'eto_register_settings');
 ?>
 
 <div class="wrap">
     <h1><?php _e('Impostazioni ETO', 'eto'); ?></h1>
     
-    <?php settings_errors(); ?>
+    <div id="eto-settings-messages"></div>
     
-    <form method="post" action="options.php">
-        <?php
-        // Output dei campi nascosti necessari per WordPress
-        settings_fields('eto_settings');
-        do_settings_sections('eto-settings');
-        ?>
+    <form id="eto-settings-form" method="post">
+        <input type="hidden" name="action" value="eto_save_settings">
+        <input type="hidden" name="eto_settings_nonce" value="<?php echo wp_create_nonce('eto_save_settings'); ?>">
         
         <div class="eto-settings-container">
             <div class="eto-settings-section">
@@ -175,6 +159,54 @@ add_action('admin_init', 'eto_register_settings');
             </div>
         </div>
         
-        <?php submit_button(__('Salva Impostazioni', 'eto')); ?>
+        <p class="submit">
+            <button type="submit" class="button button-primary"><?php _e('Salva Impostazioni', 'eto'); ?></button>
+        </p>
     </form>
 </div>
+
+<script>
+jQuery(document).ready(function($) {
+    // Gestione invio form tramite AJAX
+    $('#eto-settings-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Mostra messaggio di caricamento
+        $('#eto-settings-messages').html('<div class="notice notice-info"><p>Salvataggio impostazioni in corso...</p></div>');
+        
+        // Ottieni i dati del form
+        var formData = new FormData(this);
+        
+        // Gestisci i checkbox non selezionati
+        if (!$('#eto_enable_third_place_match').is(':checked')) {
+            formData.append('eto_enable_third_place_match', '0');
+        }
+        
+        if (!$('#eto_enable_riot_api').is(':checked')) {
+            formData.append('eto_enable_riot_api', '0');
+        }
+        
+        // Invia la richiesta AJAX
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    // Mostra messaggio di successo
+                    $('#eto-settings-messages').html('<div class="notice notice-success"><p>' + response.data.message + '</p></div>');
+                } else {
+                    // Mostra messaggio di errore
+                    $('#eto-settings-messages').html('<div class="notice notice-error"><p>Errore: ' + response.data.message + '</p></div>');
+                }
+            },
+            error: function(xhr, status, error) {
+                // Mostra messaggio di errore
+                $('#eto-settings-messages').html('<div class="notice notice-error"><p>Errore durante la richiesta: ' + error + '</p></div>');
+            }
+        });
+    });
+});
+</script>
