@@ -8,7 +8,6 @@
  * @subpackage Admin
  * @since 2.5.3
  */
-
 // Impedisci l'accesso diretto
 if (!defined('ABSPATH')) exit;
 
@@ -27,7 +26,8 @@ function eto_admin_init() {
     
     // Inizializza le impostazioni
     $settings = new ETO_Settings_Register();
-    $settings->init();
+    // Non chiamiamo il metodo init() perché non esiste nella classe ETO_Settings_Register
+    // La classe ETO_Settings_Register chiama già init_hooks() nel costruttore
 }
 
 // Aggiungi il menu di amministrazione
