@@ -175,7 +175,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($result) {
                 // Reindirizza alla pagina dei tornei con messaggio di successo
-                wp_redirect(admin_url('admin.php?page=eto-tournaments&message=created'));
+                // Modifica: Utilizzo di site_url() invece di admin_url() per garantire un percorso assoluto
+                wp_redirect(site_url('wp-admin/admin.php?page=eto-tournaments&message=created'));
                 exit;
             } else {
                 wp_die('Errore durante la creazione del torneo');
@@ -211,7 +212,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($result) {
                 // Reindirizza alla pagina dei team con messaggio di successo
-                wp_redirect(admin_url('admin.php?page=eto-teams&message=created'));
+                // Modifica: Utilizzo di site_url() invece di admin_url() per garantire un percorso assoluto
+                wp_redirect(site_url('wp-admin/admin.php?page=eto-teams&message=created'));
                 exit;
             } else {
                 wp_die('Errore durante la creazione del team');

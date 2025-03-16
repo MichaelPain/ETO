@@ -24,6 +24,22 @@ if (!defined('ETO_DEBUG_LOG')) {
     define('ETO_DEBUG_LOG', ETO_PLUGIN_DIR . '/logs/debug.log');
 }
 
+// Aggiungi le opzioni alla whitelist
+function eto_add_allowed_options($allowed_options) {
+    $allowed_options['eto_settings'] = [
+        'eto_default_format',
+        'eto_default_game',
+        'eto_max_teams_per_tournament',
+        'eto_enable_third_place_match',
+        'eto_riot_api_key',
+        'eto_enable_riot_api',
+        'eto_tournament_page',
+        'eto_team_page'
+    ];
+    return $allowed_options;
+}
+add_filter('allowed_options', 'eto_add_allowed_options');
+
 // 2. VERIFICA PERMESSI FILE SYSTEM
 // Inizializzazione sicura dell'array dei permessi
 global $required_perms;
@@ -431,6 +447,8 @@ function eto_init() {
             $shortcodes->register();
         }
     }
+// Includi il gestore dei form
+require_once ETO_PLUGIN_DIR . '/includes/class-form-handler.php';
     
     // Pianifica attività di manutenzione
     if (!wp_next_scheduled('eto_daily_maintenance')) {

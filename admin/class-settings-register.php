@@ -36,6 +36,29 @@ class ETO_Settings_Register {
      * Registra le impostazioni del plugin
      */
     public function register_settings() {
+add_filter('allowed_options', function($allowed_options) {
+    $allowed_options['eto_settings'] = [
+        'eto_default_format',
+        'eto_default_game',
+        'eto_max_teams_per_tournament',
+        'eto_enable_third_place_match',
+        'eto_riot_api_key',
+        'eto_enable_riot_api',
+        'eto_tournament_page',
+        'eto_team_page'
+    ];
+    return $allowed_options;
+});
+// Assicurati che tutte le opzioni siano registrate
+register_setting('eto_settings', 'eto_default_format');
+register_setting('eto_settings', 'eto_default_game');
+register_setting('eto_settings', 'eto_max_teams_per_tournament');
+register_setting('eto_settings', 'eto_enable_third_place_match');
+register_setting('eto_settings', 'eto_riot_api_key');
+register_setting('eto_settings', 'eto_enable_riot_api');
+register_setting('eto_settings', 'eto_tournament_page');
+register_setting('eto_settings', 'eto_team_page');
+
         // Registra la sezione delle impostazioni generali
         add_settings_section(
             'eto_general_settings',
