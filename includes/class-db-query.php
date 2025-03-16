@@ -1,9 +1,9 @@
 <?php
 /**
  * Classe per la gestione delle query al database
- * 
+ *
  * Fornisce metodi sicuri per interagire con il database
- * 
+ *
  * @package ETO
  * @since 2.5.1
  */
@@ -35,6 +35,7 @@ class ETO_DB_Query {
      */
     public function get_table_name($table) {
         global $wpdb;
+        
         return $wpdb->prefix . 'eto_' . $table;
     }
     
@@ -232,234 +233,14 @@ class ETO_DB_Query {
         // Filtro per captain_id
         if (!empty($args['captain_id'])) {
             $query .= " AND captain_id = %d";
-            $query_args[] = absint($args['captain_id']);
+            $query_args[] = $args['captain_id'];
         }
         
         // Prepara la query con tutti i parametri
-        if (!empty($query_args)) {
-            $prepared_query = $wpdb->prepare($query, $query_args);
-        } else {
-            $prepared_query = $query;
-        }
+        $prepared_query = $wpdb->prepare($query, $query_args);
         
         // Esegui la query
         return (int) $wpdb->get_var($prepared_query);
-    }
-    
-    /**
-     * Inserisce un nuovo torneo nel database
-     *
-     * @param array $data Dati del torneo
-     * @return int|false ID del torneo inserito o false in caso di errore
-     */
-    public function insert_tournament($data) {
-        global $wpdb;
-        
-        // Verifica i dati obbligatori
-        if (empty($data['name']) || empty($data['format']) || empty($data['created_by'])) {
-            return false;
-        }
-        
-        // Sanitizzazione
-        $tournament_data = [
-            'name' => sanitize_text_field($data['name']),
-            'description' => isset($data['description']) ? wp_kses_post($data['description']) : '',
-            'format' => sanitize_text_field($data['format']),
-            'elimination_type' => isset($data['elimination_type']) ? sanitize_text_field($data['elimination_type']) : 'single',
-            'status' => isset($data['status']) ? sanitize_text_field($data['status']) : 'pending',
-            'start_date' => isset($data['start_date']) ? sanitize_text_field($data['start_date']) : null,
-            'end_date' => isset($data['end_date']) ? sanitize_text_field($data['end_date']) : null,
-            'max_teams' => isset($data['max_teams']) ? absint($data['max_teams']) : 8,
-            'created_by' => absint($data['created_by']),
-            'created_at' => current_time('mysql')
-        ];
-        
-        $table = $this->get_table_name('tournaments');
-        
-        // Inserisci il torneo
-        $result = $wpdb->insert(
-            $table,
-            $tournament_data,
-            [
-                '%s', // name
-                '%s', // description
-                '%s', // format
-                '%s', // elimination_type
-                '%s', // status
-                '%s', // start_date
-                '%s', // end_date
-                '%d', // max_teams
-                '%d', // created_by
-                '%s'  // created_at
-            ]
-        );
-        
-        if ($result === false) {
-            if (defined('ETO_DEBUG') && ETO_DEBUG) {
-                error_log('[ETO] Errore inserimento torneo: ' . $wpdb->last_error);
-            }
-            return false;
-        }
-        
-        $tournament_id = $wpdb->insert_id;
-        
-        // Registra l'azione nel log audit
-        $this->log_action(
-            'create',
-            'tournament',
-            $tournament_id,
-            [
-                'name' => $tournament_data['name'],
-                'format' => $tournament_data['format']
-            ],
-            $tournament_data['created_by']
-        );
-        
-        return $tournament_id;
-    }
-    
-    /**
-     * Aggiorna un torneo esistente
-     *
-     * @param int $tournament_id ID del torneo
-     * @param array $data Dati da aggiornare
-     * @return bool True se l'aggiornamento è riuscito, false altrimenti
-     */
-    public function update_tournament($tournament_id, $data) {
-        global $wpdb;
-        
-        $tournament_id = absint($tournament_id);
-        if ($tournament_id <= 0 || empty($data)) {
-            return false;
-        }
-        
-        $table = $this->get_table_name('tournaments');
-        
-        // Campi aggiornabili e relativi formati
-        $allowed_fields = [
-            'name' => '%s',
-            'description' => '%s',
-            'format' => '%s',
-            'elimination_type' => '%s',
-            'status' => '%s',
-            'start_date' => '%s',
-            'end_date' => '%s',
-            'registration_start' => '%s',
-            'registration_end' => '%s',
-            'min_teams' => '%d',
-            'max_teams' => '%d',
-            'rules' => '%s',
-            'prizes' => '%s',
-            'featured_image' => '%s',
-            'updated_at' => '%s'
-        ];
-        
-        $update_data = [];
-        $formats = [];
-        
-        // Prepara i dati da aggiornare
-        foreach ($allowed_fields as $field => $format) {
-            if (isset($data[$field])) {
-                $update_data[$field] = $data[$field];
-                $formats[] = $format;
-            }
-        }
-        
-        // Aggiungi la data di aggiornamento
-        if (!isset($update_data['updated_at'])) {
-            $update_data['updated_at'] = current_time('mysql');
-            $formats[] = '%s';
-        }
-        
-        // Aggiorna il torneo
-        $result = $wpdb->update(
-            $table,
-            $update_data,
-            ['id' => $tournament_id],
-            $formats,
-            ['%d']
-        );
-        
-        if ($result === false) {
-            if (defined('ETO_DEBUG') && ETO_DEBUG) {
-                error_log('[ETO] Errore aggiornamento torneo: ' . $wpdb->last_error);
-            }
-            return false;
-        }
-        
-        // Registra l'azione nel log audit
-        $this->log_action(
-            'update',
-            'tournament',
-            $tournament_id,
-            $update_data,
-            get_current_user_id()
-        );
-        
-        return true;
-    }
-    
-    /**
-     * Elimina un torneo
-     *
-     * @param int $tournament_id ID del torneo
-     * @return bool True se l'eliminazione è riuscita, false altrimenti
-     */
-    public function delete_tournament($tournament_id) {
-        global $wpdb;
-        
-        $tournament_id = absint($tournament_id);
-        if ($tournament_id <= 0) {
-            return false;
-        }
-        
-        $table = $this->get_table_name('tournaments');
-        
-        // Elimina il torneo
-        $result = $wpdb->delete(
-            $table,
-            ['id' => $tournament_id],
-            ['%d']
-        );
-        
-        if ($result === false) {
-            if (defined('ETO_DEBUG') && ETO_DEBUG) {
-                error_log('[ETO] Errore eliminazione torneo: ' . $wpdb->last_error);
-            }
-            return false;
-        }
-        
-        // Registra l'azione nel log audit
-        $this->log_action(
-            'delete',
-            'tournament',
-            $tournament_id,
-            [],
-            get_current_user_id()
-        );
-        
-        return true;
-    }
-    
-    /**
-     * Ottiene un singolo team dal database
-     *
-     * @param int $team_id ID del team
-     * @return object|false Oggetto team o false se non trovato
-     */
-    public function get_team($team_id) {
-        global $wpdb;
-        
-        $table = $this->get_table_name('teams');
-        
-        $team = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT * FROM $table WHERE id = %d",
-                $team_id
-            )
-        );
-        
-        return $team;
     }
     
     /**
@@ -472,6 +253,7 @@ class ETO_DB_Query {
         global $wpdb;
         
         $defaults = [
+            'game' => '',
             'limit' => 10,
             'offset' => 0,
             'orderby' => 'name',
@@ -507,7 +289,7 @@ class ETO_DB_Query {
         // Filtro per captain_id
         if (!empty($args['captain_id'])) {
             $query .= " AND captain_id = %d";
-            $query_args[] = absint($args['captain_id']);
+            $query_args[] = $args['captain_id'];
         }
         
         // Ordinamento
@@ -528,6 +310,400 @@ class ETO_DB_Query {
     }
     
     /**
+     * Ottiene un singolo team dal database
+     *
+     * @param int $team_id ID del team
+     * @return object|false Oggetto team o false se non trovato
+     */
+    public function get_team($team_id) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('teams');
+        
+        $team = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM $table WHERE id = %d",
+                $team_id
+            )
+        );
+        
+        return $team;
+    }
+    
+    /**
+     * Ottiene un team dal suo slug
+     *
+     * @param string $slug Slug del team
+     * @return object|false Oggetto team o false se non trovato
+     */
+    public function get_team_by_slug($slug) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('teams');
+        
+        $team = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM $table WHERE slug = %s",
+                $slug
+            )
+        );
+        
+        return $team;
+    }
+    
+    /**
+     * Ottiene i membri di un team
+     *
+     * @param int $team_id ID del team
+     * @return array Lista di membri del team
+     */
+    public function get_team_members($team_id) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('team_members');
+        
+        $members = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM $table WHERE team_id = %d ORDER BY role ASC",
+                $team_id
+            )
+        );
+        
+        return $members;
+    }
+    
+    /**
+     * Ottiene le partite di un torneo
+     *
+     * @param int $tournament_id ID del torneo
+     * @param array $args Argomenti di query
+     * @return array Lista di partite
+     */
+    public function get_tournament_matches($tournament_id, $args = []) {
+        global $wpdb;
+        
+        $defaults = [
+            'round' => 0,
+            'status' => '',
+            'orderby' => 'match_number',
+            'order' => 'ASC'
+        ];
+        
+        $args = wp_parse_args($args, $defaults);
+        
+        // Whitelist per orderby
+        $allowed_orderby = ['id', 'round', 'match_number', 'scheduled_date'];
+        if (!in_array($args['orderby'], $allowed_orderby)) {
+            $args['orderby'] = 'match_number';
+        }
+        
+        // Whitelist per order
+        $args['order'] = strtoupper($args['order']) === 'DESC' ? 'DESC' : 'ASC';
+        
+        $table = $this->get_table_name('matches');
+        
+        $query = "SELECT * FROM $table WHERE tournament_id = %d";
+        $query_args = [$tournament_id];
+        
+        // Filtro per round
+        if (!empty($args['round'])) {
+            $query .= " AND round = %d";
+            $query_args[] = $args['round'];
+        }
+        
+        // Filtro per status
+        if (!empty($args['status'])) {
+            $query .= " AND status = %s";
+            $query_args[] = $args['status'];
+        }
+        
+        // Ordinamento
+        $query .= " ORDER BY {$args['orderby']} {$args['order']}";
+        
+        // Prepara la query con tutti i parametri
+        $prepared_query = $wpdb->prepare($query, $query_args);
+        
+        // Esegui la query
+        $results = $wpdb->get_results($prepared_query);
+        
+        return $results;
+    }
+    
+    /**
+     * Ottiene una singola partita dal database
+     *
+     * @param int $match_id ID della partita
+     * @return object|false Oggetto partita o false se non trovato
+     */
+    public function get_match($match_id) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('matches');
+        
+        $match = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM $table WHERE id = %d",
+                $match_id
+            )
+        );
+        
+        return $match;
+    }
+    
+    /**
+     * Ottiene le iscrizioni a un torneo
+     *
+     * @param int $tournament_id ID del torneo
+     * @param string $status Status dell'iscrizione (opzionale)
+     * @return array Lista di iscrizioni
+     */
+    public function get_tournament_registrations($tournament_id, $status = '') {
+        global $wpdb;
+        
+        $table = $this->get_table_name('tournament_registrations');
+        
+        $query = "SELECT * FROM $table WHERE tournament_id = %d";
+        $query_args = [$tournament_id];
+        
+        if (!empty($status)) {
+            $query .= " AND status = %s";
+            $query_args[] = $status;
+        }
+        
+        $query .= " ORDER BY registered_at ASC";
+        
+        // Prepara la query con tutti i parametri
+        $prepared_query = $wpdb->prepare($query, $query_args);
+        
+        // Esegui la query
+        $results = $wpdb->get_results($prepared_query);
+        
+        return $results;
+    }
+    
+    /**
+     * Verifica se un team è iscritto a un torneo
+     *
+     * @param int $tournament_id ID del torneo
+     * @param int $team_id ID del team
+     * @return bool True se il team è iscritto, false altrimenti
+     */
+    public function is_team_registered($tournament_id, $team_id) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('tournament_registrations');
+        
+        $registration = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM $table WHERE tournament_id = %d AND team_id = %d",
+                $tournament_id,
+                $team_id
+            )
+        );
+        
+        return !empty($registration);
+    }
+    
+    /**
+     * Inserisce un nuovo torneo nel database
+     *
+     * @param array $data Dati del torneo
+     * @return int|false ID del torneo inserito o false in caso di errore
+     */
+    public function insert_tournament($data) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('tournaments');
+        
+        // Assicura che i campi obbligatori siano presenti
+        if (empty($data['name']) || empty($data['slug']) || empty($data['game']) || empty($data['format'])) {
+            return false;
+        }
+        
+        // Verifica se lo slug esiste già
+        $exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM $table WHERE slug = %s",
+                $data['slug']
+            )
+        );
+        
+        if ($exists) {
+            // Genera uno slug univoco
+            $original_slug = $data['slug'];
+            $counter = 1;
+            
+            do {
+                $data['slug'] = $original_slug . '-' . $counter;
+                $counter++;
+                
+                $exists = $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT COUNT(*) FROM $table WHERE slug = %s",
+                        $data['slug']
+                    )
+                );
+            } while ($exists);
+        }
+        
+        // Imposta i valori predefiniti
+        $data = wp_parse_args($data, [
+            'description' => '',
+            'start_date' => current_time('mysql'),
+            'end_date' => current_time('mysql'),
+            'registration_start' => null,
+            'registration_end' => null,
+            'min_teams' => 2,
+            'max_teams' => 16,
+            'rules' => '',
+            'prizes' => '',
+            'featured_image' => '',
+            'status' => 'draft',
+            'created_by' => get_current_user_id(),
+            'created_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql')
+        ]);
+        
+        // Inserisci il torneo
+        $wpdb->insert(
+            $table,
+            $data,
+            [
+                '%s', // name
+                '%s', // slug
+                '%s', // description
+                '%s', // game
+                '%s', // format
+                '%s', // start_date
+                '%s', // end_date
+                '%s', // registration_start
+                '%s', // registration_end
+                '%d', // min_teams
+                '%d', // max_teams
+                '%s', // rules
+                '%s', // prizes
+                '%s', // featured_image
+                '%s', // status
+                '%d', // created_by
+                '%s', // created_at
+                '%s'  // updated_at
+            ]
+        );
+        
+        if ($wpdb->last_error) {
+            return false;
+        }
+        
+        return $wpdb->insert_id;
+    }
+    
+    /**
+     * Aggiorna un torneo esistente
+     *
+     * @param int $tournament_id ID del torneo
+     * @param array $data Dati da aggiornare
+     * @return bool True se l'aggiornamento è riuscito, false altrimenti
+     */
+    public function update_tournament($tournament_id, $data) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('tournaments');
+        
+        // Verifica se il torneo esiste
+        $tournament = $this->get_tournament($tournament_id);
+        if (!$tournament) {
+            return false;
+        }
+        
+        // Verifica se lo slug è cambiato e se esiste già
+        if (!empty($data['slug']) && $data['slug'] !== $tournament->slug) {
+            $exists = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM $table WHERE slug = %s AND id != %d",
+                    $data['slug'],
+                    $tournament_id
+                )
+            );
+            
+            if ($exists) {
+                // Genera uno slug univoco
+                $original_slug = $data['slug'];
+                $counter = 1;
+                
+                do {
+                    $data['slug'] = $original_slug . '-' . $counter;
+                    $counter++;
+                    
+                    $exists = $wpdb->get_var(
+                        $wpdb->prepare(
+                            "SELECT COUNT(*) FROM $table WHERE slug = %s AND id != %d",
+                            $data['slug'],
+                            $tournament_id
+                        )
+                    );
+                } while ($exists);
+            }
+        }
+        
+        // Imposta la data di aggiornamento
+        $data['updated_at'] = current_time('mysql');
+        
+        // Aggiorna il torneo
+        $result = $wpdb->update(
+            $table,
+            $data,
+            ['id' => $tournament_id],
+            '%s',
+            '%d'
+        );
+        
+        return $result !== false;
+    }
+    
+    /**
+     * Elimina un torneo
+     *
+     * @param int $tournament_id ID del torneo
+     * @return bool True se l'eliminazione è riuscita, false altrimenti
+     */
+    public function delete_tournament($tournament_id) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('tournaments');
+        
+        // Verifica se il torneo esiste
+        $tournament = $this->get_tournament($tournament_id);
+        if (!$tournament) {
+            return false;
+        }
+        
+        // Elimina le iscrizioni al torneo
+        $registrations_table = $this->get_table_name('tournament_registrations');
+        $wpdb->delete(
+            $registrations_table,
+            ['tournament_id' => $tournament_id],
+            '%d'
+        );
+        
+        // Elimina le partite del torneo
+        $matches_table = $this->get_table_name('matches');
+        $wpdb->delete(
+            $matches_table,
+            ['tournament_id' => $tournament_id],
+            '%d'
+        );
+        
+        // Elimina il torneo
+        $result = $wpdb->delete(
+            $table,
+            ['id' => $tournament_id],
+            '%d'
+        );
+        
+        return $result !== false;
+    }
+    
+    /**
      * Inserisce un nuovo team nel database
      *
      * @param array $data Dati del team
@@ -536,33 +712,55 @@ class ETO_DB_Query {
     public function insert_team($data) {
         global $wpdb;
         
-        // Verifica i dati obbligatori
-        if (empty($data['name']) || empty($data['game']) || empty($data['captain_id'])) {
+        $table = $this->get_table_name('teams');
+        
+        // Assicura che i campi obbligatori siano presenti
+        if (empty($data['name']) || empty($data['slug']) || empty($data['game']) || empty($data['captain_id'])) {
             return false;
         }
         
-        // Sanitizzazione
-        $team_data = [
-            'name' => sanitize_text_field($data['name']),
-            'description' => isset($data['description']) ? wp_kses_post($data['description']) : '',
-            'game' => sanitize_text_field($data['game']),
-            'logo_url' => isset($data['logo_url']) ? esc_url_raw($data['logo_url']) : '',
-            'captain_id' => absint($data['captain_id']),
-            'email' => isset($data['email']) ? sanitize_email($data['email']) : '',
-            'website' => isset($data['website']) ? esc_url_raw($data['website']) : '',
-            'social_media' => isset($data['social_media']) ? json_encode($data['social_media']) : '{}',
-            'created_by' => isset($data['created_by']) ? absint($data['created_by']) : get_current_user_id(),
-            'created_at' => current_time('mysql')
-        ];
+        // Verifica se lo slug esiste già
+        $exists = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM $table WHERE slug = %s",
+                $data['slug']
+            )
+        );
         
-        // Genera uno slug univoco
-        $table = $this->get_table_name('teams');
-        $team_data['slug'] = eto_generate_unique_slug($team_data['name'], $table);
+        if ($exists) {
+            // Genera uno slug univoco
+            $original_slug = $data['slug'];
+            $counter = 1;
+            
+            do {
+                $data['slug'] = $original_slug . '-' . $counter;
+                $counter++;
+                
+                $exists = $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT COUNT(*) FROM $table WHERE slug = %s",
+                        $data['slug']
+                    )
+                );
+            } while ($exists);
+        }
+        
+        // Imposta i valori predefiniti
+        $data = wp_parse_args($data, [
+            'description' => '',
+            'logo_url' => '',
+            'email' => '',
+            'website' => '',
+            'social_media' => '',
+            'created_by' => get_current_user_id(),
+            'created_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql')
+        ]);
         
         // Inserisci il team
-        $result = $wpdb->insert(
+        $wpdb->insert(
             $table,
-            $team_data,
+            $data,
             [
                 '%s', // name
                 '%s', // slug
@@ -574,32 +772,16 @@ class ETO_DB_Query {
                 '%s', // website
                 '%s', // social_media
                 '%d', // created_by
-                '%s'  // created_at
+                '%s', // created_at
+                '%s'  // updated_at
             ]
         );
         
-        if ($result === false) {
-            if (defined('ETO_DEBUG') && ETO_DEBUG) {
-                error_log('[ETO] Errore inserimento team: ' . $wpdb->last_error);
-            }
+        if ($wpdb->last_error) {
             return false;
         }
         
-        $team_id = $wpdb->insert_id;
-        
-        // Registra l'azione nel log audit
-        $this->log_action(
-            'create',
-            'team',
-            $team_id,
-            [
-                'name' => $team_data['name'],
-                'game' => $team_data['game']
-            ],
-            $team_data['created_by']
-        );
-        
-        return $team_id;
+        return $wpdb->insert_id;
     }
     
     /**
@@ -612,75 +794,57 @@ class ETO_DB_Query {
     public function update_team($team_id, $data) {
         global $wpdb;
         
-        $team_id = absint($team_id);
-        if ($team_id <= 0 || empty($data)) {
+        $table = $this->get_table_name('teams');
+        
+        // Verifica se il team esiste
+        $team = $this->get_team($team_id);
+        if (!$team) {
             return false;
         }
         
-        $table = $this->get_table_name('teams');
-        
-        // Campi aggiornabili e relativi formati
-        $allowed_fields = [
-            'name' => '%s',
-            'description' => '%s',
-            'game' => '%s',
-            'logo_url' => '%s',
-            'captain_id' => '%d',
-            'email' => '%s',
-            'website' => '%s',
-            'social_media' => '%s',
-            'updated_at' => '%s'
-        ];
-        
-        $update_data = [];
-        $formats = [];
-        
-        // Prepara i dati da aggiornare
-        foreach ($allowed_fields as $field => $format) {
-            if (isset($data[$field])) {
-                $update_data[$field] = $data[$field];
-                $formats[] = $format;
+        // Verifica se lo slug è cambiato e se esiste già
+        if (!empty($data['slug']) && $data['slug'] !== $team->slug) {
+            $exists = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM $table WHERE slug = %s AND id != %d",
+                    $data['slug'],
+                    $team_id
+                )
+            );
+            
+            if ($exists) {
+                // Genera uno slug univoco
+                $original_slug = $data['slug'];
+                $counter = 1;
+                
+                do {
+                    $data['slug'] = $original_slug . '-' . $counter;
+                    $counter++;
+                    
+                    $exists = $wpdb->get_var(
+                        $wpdb->prepare(
+                            "SELECT COUNT(*) FROM $table WHERE slug = %s AND id != %d",
+                            $data['slug'],
+                            $team_id
+                        )
+                    );
+                } while ($exists);
             }
         }
         
-        // Aggiorna lo slug se il nome è cambiato
-        if (isset($update_data['name'])) {
-            $update_data['slug'] = eto_generate_unique_slug($update_data['name'], $table, $team_id);
-            $formats[] = '%s';
-        }
-        
-        // Aggiungi la data di aggiornamento
-        if (!isset($update_data['updated_at'])) {
-            $update_data['updated_at'] = current_time('mysql');
-            $formats[] = '%s';
-        }
+        // Imposta la data di aggiornamento
+        $data['updated_at'] = current_time('mysql');
         
         // Aggiorna il team
         $result = $wpdb->update(
             $table,
-            $update_data,
+            $data,
             ['id' => $team_id],
-            $formats,
-            ['%d']
+            '%s',
+            '%d'
         );
         
-        if ($result === false) {
-            if (defined('ETO_DEBUG') && ETO_DEBUG) {
-                error_log('[ETO] Errore aggiornamento team: ' . $wpdb->last_error);
-            }
-            return false;
-        }
-        
-        // Registra l'azione nel log audit
-        $this->log_action(
-            'update',
-            'team',
-            $team_id,
-            $update_data,
-            get_current_user_id()
-        );
-        
-        return true;
+        return $result !== false;
     }
     
     /**
@@ -692,76 +856,222 @@ class ETO_DB_Query {
     public function delete_team($team_id) {
         global $wpdb;
         
-        $team_id = absint($team_id);
-        if ($team_id <= 0) {
+        $table = $this->get_table_name('teams');
+        
+        // Verifica se il team esiste
+        $team = $this->get_team($team_id);
+        if (!$team) {
             return false;
         }
         
-        $table = $this->get_table_name('teams');
+        // Elimina le iscrizioni del team ai tornei
+        $registrations_table = $this->get_table_name('tournament_registrations');
+        $wpdb->delete(
+            $registrations_table,
+            ['team_id' => $team_id],
+            '%d'
+        );
+        
+        // Elimina i membri del team
+        $members_table = $this->get_table_name('team_members');
+        $wpdb->delete(
+            $members_table,
+            ['team_id' => $team_id],
+            '%d'
+        );
         
         // Elimina il team
         $result = $wpdb->delete(
             $table,
             ['id' => $team_id],
-            ['%d']
+            '%d'
         );
         
-        if ($result === false) {
-            if (defined('ETO_DEBUG') && ETO_DEBUG) {
-                error_log('[ETO] Errore eliminazione team: ' . $wpdb->last_error);
-            }
-            return false;
-        }
-        
-        // Registra l'azione nel log audit
-        $this->log_action(
-            'delete',
-            'team',
-            $team_id,
-            [],
-            get_current_user_id()
-        );
-        
-        return true;
+        return $result !== false;
     }
     
     /**
-     * Registra un'azione nel log audit
+     * Iscrive un team a un torneo
      *
-     * @param string $action Azione eseguita
-     * @param string $object_type Tipo di oggetto
-     * @param int $object_id ID dell'oggetto
-     * @param array $data Dati aggiuntivi
-     * @param int $user_id ID dell'utente
-     * @return bool True se il log è stato registrato, false altrimenti
+     * @param int $tournament_id ID del torneo
+     * @param int $team_id ID del team
+     * @param string $status Status dell'iscrizione
+     * @return int|false ID dell'iscrizione o false in caso di errore
      */
-    public function log_action($action, $object_type, $object_id, $data = [], $user_id = 0) {
+    public function register_team_to_tournament($tournament_id, $team_id, $status = 'pending') {
         global $wpdb;
         
-        if (empty($user_id)) {
-            $user_id = get_current_user_id();
+        $table = $this->get_table_name('tournament_registrations');
+        
+        // Verifica se il torneo e il team esistono
+        $tournament = $this->get_tournament($tournament_id);
+        $team = $this->get_team($team_id);
+        
+        if (!$tournament || !$team) {
+            return false;
         }
         
-        $table = $this->get_table_name('logs');
+        // Verifica se il team è già iscritto
+        if ($this->is_team_registered($tournament_id, $team_id)) {
+            return false;
+        }
         
-        $result = $wpdb->insert(
+        // Inserisci l'iscrizione
+        $wpdb->insert(
             $table,
             [
-                'action' => $action,
-                'object_type' => $object_type,
-                'object_id' => $object_id,
-                'data' => json_encode($data),
-                'user_id' => $user_id,
-                'created_at' => current_time('mysql')
+                'tournament_id' => $tournament_id,
+                'team_id' => $team_id,
+                'status' => $status,
+                'registered_at' => current_time('mysql')
             ],
             [
-                '%s', // action
-                '%s', // object_type
-                '%d', // object_id
-                '%s', // data
-                '%d', // user_id
-                '%s'  // created_at
+                '%d', // tournament_id
+                '%d', // team_id
+                '%s', // status
+                '%s'  // registered_at
             ]
+        );
+        
+        if ($wpdb->last_error) {
+            return false;
+        }
+        
+        return $wpdb->insert_id;
+    }
+    
+    /**
+     * Aggiorna lo status di un'iscrizione
+     *
+     * @param int $registration_id ID dell'iscrizione
+     * @param string $status Nuovo status
+     * @return bool True se l'aggiornamento è riuscito, false altrimenti
+     */
+    public function update_registration_status($registration_id, $status) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('tournament_registrations');
+        
+        // Aggiorna lo status
+        $result = $wpdb->update(
+            $table,
+            ['status' => $status],
+            ['id' => $registration_id],
+            '%s',
+            '%d'
+        );
+        
+        return $result !== false;
+    }
+    
+    /**
+     * Inserisce una nuova partita nel database
+     *
+     * @param array $data Dati della partita
+     * @return int|false ID della partita inserita o false in caso di errore
+     */
+    public function insert_match($data) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('matches');
+        
+        // Assicura che i campi obbligatori siano presenti
+        if (empty($data['tournament_id']) || !isset($data['round']) || !isset($data['match_number'])) {
+            return false;
+        }
+        
+        // Imposta i valori predefiniti
+        $data = wp_parse_args($data, [
+            'team1_id' => null,
+            'team2_id' => null,
+            'team1_score' => 0,
+            'team2_score' => 0,
+            'winner_id' => null,
+            'status' => 'pending',
+            'scheduled_date' => null,
+            'completed_date' => null,
+            'notes' => ''
+        ]);
+        
+        // Inserisci la partita
+        $wpdb->insert(
+            $table,
+            $data,
+            [
+                '%d', // tournament_id
+                '%d', // round
+                '%d', // match_number
+                '%d', // team1_id
+                '%d', // team2_id
+                '%d', // team1_score
+                '%d', // team2_score
+                '%d', // winner_id
+                '%s', // status
+                '%s', // scheduled_date
+                '%s', // completed_date
+                '%s'  // notes
+            ]
+        );
+        
+        if ($wpdb->last_error) {
+            return false;
+        }
+        
+        return $wpdb->insert_id;
+    }
+    
+    /**
+     * Aggiorna una partita esistente
+     *
+     * @param int $match_id ID della partita
+     * @param array $data Dati da aggiornare
+     * @return bool True se l'aggiornamento è riuscito, false altrimenti
+     */
+    public function update_match($match_id, $data) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('matches');
+        
+        // Verifica se la partita esiste
+        $match = $this->get_match($match_id);
+        if (!$match) {
+            return false;
+        }
+        
+        // Aggiorna la partita
+        $result = $wpdb->update(
+            $table,
+            $data,
+            ['id' => $match_id],
+            '%s',
+            '%d'
+        );
+        
+        return $result !== false;
+    }
+    
+    /**
+     * Elimina una partita
+     *
+     * @param int $match_id ID della partita
+     * @return bool True se l'eliminazione è riuscita, false altrimenti
+     */
+    public function delete_match($match_id) {
+        global $wpdb;
+        
+        $table = $this->get_table_name('matches');
+        
+        // Verifica se la partita esiste
+        $match = $this->get_match($match_id);
+        if (!$match) {
+            return false;
+        }
+        
+        // Elimina la partita
+        $result = $wpdb->delete(
+            $table,
+            ['id' => $match_id],
+            '%d'
         );
         
         return $result !== false;

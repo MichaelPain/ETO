@@ -29,6 +29,9 @@ require_once ETO_PLUGIN_DIR . 'eto-widgets.php';
 // Includi il gestore AJAX
 require_once ETO_PLUGIN_DIR . 'eto-ajax-handler.php';
 
+// Includi i file delle classi principali
+require_once ETO_PLUGIN_DIR . 'includes/class-db-query.php';
+
 // Includi i file di amministrazione
 if (is_admin()) {
     require_once ETO_PLUGIN_DIR . 'admin/eto-admin.php';
@@ -65,98 +68,11 @@ function eto_deactivate() {
     flush_rewrite_rules();
 }
 
-// Crea le tabelle del database
-function eto_create_tables() {
-    global $wpdb;
-    
-    $charset_collate = $wpdb->get_charset_collate();
-    
-    // Tabella dei tornei
-    $table_name = $wpdb->prefix . 'eto_tournaments';
-    $sql = "CREATE TABLE $table_name (
-        id mediumint(9) NOT NULL AUTO_INCREMENT,
-        name varchar(255) NOT NULL,
-        slug varchar(255) NOT NULL,
-        description text,
-        game varchar(50) NOT NULL,
-        format varchar(50) NOT NULL,
-        start_date datetime NOT NULL,
-        end_date datetime NOT NULL,
-        registration_start datetime,
-        registration_end datetime,
-        min_teams int DEFAULT 2,
-        max_teams int DEFAULT 16,
-        rules text,
-        prizes text,
-        featured_image varchar(255),
-        status varchar(20) DEFAULT 'draft',
-        created_by bigint(20),
-        created_at datetime DEFAULT CURRENT_TIMESTAMP,
-        updated_at datetime,
-        PRIMARY KEY  (id),
-        UNIQUE KEY slug (slug)
-    ) $charset_collate;";
-    
-    // Tabella dei team
-    $table_name = $wpdb->prefix . 'eto_teams';
-    $sql .= "CREATE TABLE $table_name (
-        id mediumint(9) NOT NULL AUTO_INCREMENT,
-        name varchar(255) NOT NULL,
-        slug varchar(255) NOT NULL,
-        description text,
-        game varchar(50) NOT NULL,
-        logo_url varchar(255),
-        captain_id bigint(20) NOT NULL,
-        email varchar(100),
-        website varchar(255),
-        social_media text,
-        created_by bigint(20),
-        created_at datetime DEFAULT CURRENT_TIMESTAMP,
-        updated_at datetime,
-        PRIMARY KEY  (id),
-        UNIQUE KEY slug (slug)
-    ) $charset_collate;";
-    
-    // Tabella delle iscrizioni ai tornei
-    $table_name = $wpdb->prefix . 'eto_tournament_registrations';
-    $sql .= "CREATE TABLE $table_name (
-        id mediumint(9) NOT NULL AUTO_INCREMENT,
-        tournament_id mediumint(9) NOT NULL,
-        team_id mediumint(9) NOT NULL,
-        status varchar(20) DEFAULT 'pending',
-        registered_at datetime DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        UNIQUE KEY tournament_team (tournament_id, team_id)
-    ) $charset_collate;";
-    
-    // Tabella delle partite
-    $table_name = $wpdb->prefix . 'eto_matches';
-    $sql .= "CREATE TABLE $table_name (
-        id mediumint(9) NOT NULL AUTO_INCREMENT,
-        tournament_id mediumint(9) NOT NULL,
-        round int NOT NULL,
-        match_number int NOT NULL,
-        team1_id mediumint(9),
-        team2_id mediumint(9),
-        team1_score int DEFAULT 0,
-        team2_score int DEFAULT 0,
-        winner_id mediumint(9),
-        status varchar(20) DEFAULT 'pending',
-        scheduled_date datetime,
-        completed_date datetime,
-        notes text,
-        PRIMARY KEY  (id)
-    ) $charset_collate;";
-    
-    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-    dbDelta($sql);
-}
-
 // Carica i file di traduzione
 function eto_load_textdomain() {
     load_plugin_textdomain('eto', false, dirname(plugin_basename(__FILE__)) . '/languages');
 }
-add_action('plugins_loaded', 'eto_load_textdomain');
+add_action('init', 'eto_load_textdomain');
 
 // Aggiungi gli script e gli stili
 function eto_enqueue_scripts() {
