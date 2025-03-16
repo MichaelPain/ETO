@@ -13,32 +13,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Funzione per generare uno slug univoco
-function eto_generate_unique_slug($title, $table_name, $existing_id = 0) {
-    global $wpdb;
-    
-    // Crea uno slug base dal titolo
-    $slug = sanitize_title($title);
-    
-    // Se lo slug è vuoto (potrebbe accadere con caratteri speciali), usa un prefisso con un timestamp
-    if (empty($slug)) {
-        $slug = 'item-' . time();
-    }
-    
-    $original_slug = $slug;
-    $i = 1;
-    
-    // Verifica se lo slug esiste già
-    while ($wpdb->get_var($wpdb->prepare(
-        "SELECT COUNT(*) FROM $table_name WHERE slug = %s AND id != %d",
-        $slug, $existing_id
-    ))) {
-        // Se esiste, aggiungi un numero incrementale
-        $slug = $original_slug . '-' . $i++;
-    }
-    
-    return $slug;
-}
+// Nota: La funzione eto_generate_unique_slug() è ora definita in eto-functions.php
+// per evitare dichiarazioni duplicate
 
 // Registra le funzioni AJAX
 function eto_register_ajax_handlers() {
