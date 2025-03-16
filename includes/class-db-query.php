@@ -24,8 +24,12 @@ class ETO_DB_Query {
      * Costruttore
      */
     public function __construct() {
-        $this->db_manager = new ETO_Database_Manager();
-    }
+     // Commentiamo temporaneamente la creazione dell'istanza di ETO_Database_Manager
+    // $this->db_manager = new ETO_Database_Manager();
+    
+    // Utilizziamo direttamente l'oggetto wpdb globale
+    global $wpdb;
+}
     
     /**
      * Ottiene il nome completo di una tabella del database
