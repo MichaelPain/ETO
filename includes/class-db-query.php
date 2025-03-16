@@ -47,7 +47,7 @@ class ETO_DB_Query {
     public function get_tournament($tournament_id) {
         global $wpdb;
         
-        $table = $this->db_manager->get_table_name('tournaments');
+        $table = $this->get_table_name('tournaments');
         
         $tournament = $wpdb->get_row(
             $wpdb->prepare(
@@ -91,7 +91,7 @@ class ETO_DB_Query {
         // Whitelist per order
         $args['order'] = strtoupper($args['order']) === 'DESC' ? 'DESC' : 'ASC';
         
-        $table = $this->db_manager->get_table_name('tournaments');
+        $table = $this->get_table_name('tournaments');
         
         $query = "SELECT * FROM $table WHERE 1=1";
         $query_args = [];
@@ -165,7 +165,7 @@ class ETO_DB_Query {
         
         $args = wp_parse_args($args, $defaults);
         
-        $table = $this->db_manager->get_table_name('tournaments');
+        $table = $this->get_table_name('tournaments');
         
         $query = "SELECT COUNT(*) FROM $table WHERE 1=1";
         $query_args = [];
@@ -204,6 +204,49 @@ class ETO_DB_Query {
     }
     
     /**
+     * Conta i team nel database
+     *
+     * @param array $args Argomenti di query
+     * @return int Numero di team
+     */
+    public function count_teams($args = []) {
+        global $wpdb;
+        
+        $defaults = [
+            'game' => ''
+        ];
+        
+        $args = wp_parse_args($args, $defaults);
+        
+        $table = $this->get_table_name('teams');
+        
+        $query = "SELECT COUNT(*) FROM $table WHERE 1=1";
+        $query_args = [];
+        
+        // Filtro per game
+        if (!empty($args['game'])) {
+            $query .= " AND game = %s";
+            $query_args[] = $args['game'];
+        }
+        
+        // Filtro per captain_id
+        if (!empty($args['captain_id'])) {
+            $query .= " AND captain_id = %d";
+            $query_args[] = absint($args['captain_id']);
+        }
+        
+        // Prepara la query con tutti i parametri
+        if (!empty($query_args)) {
+            $prepared_query = $wpdb->prepare($query, $query_args);
+        } else {
+            $prepared_query = $query;
+        }
+        
+        // Esegui la query
+        return (int) $wpdb->get_var($prepared_query);
+    }
+    
+    /**
      * Inserisce un nuovo torneo nel database
      *
      * @param array $data Dati del torneo
@@ -231,7 +274,7 @@ class ETO_DB_Query {
             'created_at' => current_time('mysql')
         ];
         
-        $table = $this->db_manager->get_table_name('tournaments');
+        $table = $this->get_table_name('tournaments');
         
         // Inserisci il torneo
         $result = $wpdb->insert(
@@ -290,7 +333,7 @@ class ETO_DB_Query {
             return false;
         }
         
-        $table = $this->db_manager->get_table_name('tournaments');
+        $table = $this->get_table_name('tournaments');
         
         // Campi aggiornabili e relativi formati
         $allowed_fields = [
@@ -301,38 +344,32 @@ class ETO_DB_Query {
             'status' => '%s',
             'start_date' => '%s',
             'end_date' => '%s',
-            'max_teams' => '%d'
+            'registration_start' => '%s',
+            'registration_end' => '%s',
+            'min_teams' => '%d',
+            'max_teams' => '%d',
+            'rules' => '%s',
+            'prizes' => '%s',
+            'featured_image' => '%s',
+            'updated_at' => '%s'
         ];
         
         $update_data = [];
         $formats = [];
         
-        // Filtra e sanitizza i dati
-        foreach ($data as $key => $value) {
-            if (array_key_exists($key, $allowed_fields)) {
-                switch ($key) {
-                    case 'name':
-                    case 'format':
-                    case 'elimination_type':
-                    case 'status':
-                    case 'start_date':
-                    case 'end_date':
-                        $update_data[$key] = sanitize_text_field($value);
-                        break;
-                    case 'description':
-                        $update_data[$key] = wp_kses_post($value);
-                        break;
-                    case 'max_teams':
-                        $update_data[$key] = absint($value);
-                        break;
-                }
-                $formats[] = $allowed_fields[$key];
+        // Prepara i dati da aggiornare
+        foreach ($allowed_fields as $field => $format) {
+            if (isset($data[$field])) {
+                $update_data[$field] = $data[$field];
+                $formats[] = $format;
             }
         }
         
-        // Aggiungi updated_at
-        $update_data['updated_at'] = current_time('mysql');
-        $formats[] = '%s';
+        // Aggiungi la data di aggiornamento
+        if (!isset($update_data['updated_at'])) {
+            $update_data['updated_at'] = current_time('mysql');
+            $formats[] = '%s';
+        }
         
         // Aggiorna il torneo
         $result = $wpdb->update(
@@ -376,13 +413,7 @@ class ETO_DB_Query {
             return false;
         }
         
-        // Prima ottieni i dati del torneo per il log
-        $tournament = $this->get_tournament($tournament_id);
-        if (!$tournament) {
-            return false;
-        }
-        
-        $table = $this->db_manager->get_table_name('tournaments');
+        $table = $this->get_table_name('tournaments');
         
         // Elimina il torneo
         $result = $wpdb->delete(
@@ -403,10 +434,7 @@ class ETO_DB_Query {
             'delete',
             'tournament',
             $tournament_id,
-            [
-                'name' => $tournament->name,
-                'format' => $tournament->format
-            ],
+            [],
             get_current_user_id()
         );
         
@@ -422,7 +450,7 @@ class ETO_DB_Query {
     public function get_team($team_id) {
         global $wpdb;
         
-        $table = $this->db_manager->get_table_name('teams');
+        $table = $this->get_table_name('teams');
         
         $team = $wpdb->get_row(
             $wpdb->prepare(
@@ -435,101 +463,307 @@ class ETO_DB_Query {
     }
     
     /**
-     * Ottiene i membri di un team
+     * Ottiene una lista di team dal database
      *
-     * @param int $team_id ID del team
-     * @return array Lista di membri
+     * @param array $args Argomenti di query
+     * @return array Lista di team
      */
-    public function get_team_members($team_id) {
+    public function get_teams($args = []) {
         global $wpdb;
         
-        $table = $this->db_manager->get_table_name('team_members');
+        $defaults = [
+            'limit' => 10,
+            'offset' => 0,
+            'orderby' => 'name',
+            'order' => 'ASC'
+        ];
         
-        $members = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT tm.*, u.display_name, u.user_email 
-                FROM $table tm
-                LEFT JOIN {$wpdb->users} u ON tm.user_id = u.ID
-                WHERE tm.team_id = %d
-                ORDER BY tm.role = 'captain' DESC, tm.joined_at ASC",
-                $team_id
-            )
-        );
+        $args = wp_parse_args($args, $defaults);
         
-        return $members;
+        // Sanitizzazione
+        $args['limit'] = absint($args['limit']);
+        $args['offset'] = absint($args['offset']);
+        
+        // Whitelist per orderby
+        $allowed_orderby = ['id', 'name', 'game', 'created_at'];
+        if (!in_array($args['orderby'], $allowed_orderby)) {
+            $args['orderby'] = 'name';
+        }
+        
+        // Whitelist per order
+        $args['order'] = strtoupper($args['order']) === 'DESC' ? 'DESC' : 'ASC';
+        
+        $table = $this->get_table_name('teams');
+        
+        $query = "SELECT * FROM $table WHERE 1=1";
+        $query_args = [];
+        
+        // Filtro per game
+        if (!empty($args['game'])) {
+            $query .= " AND game = %s";
+            $query_args[] = $args['game'];
+        }
+        
+        // Filtro per captain_id
+        if (!empty($args['captain_id'])) {
+            $query .= " AND captain_id = %d";
+            $query_args[] = absint($args['captain_id']);
+        }
+        
+        // Ordinamento
+        $query .= " ORDER BY {$args['orderby']} {$args['order']}";
+        
+        // Limite
+        $query .= " LIMIT %d OFFSET %d";
+        $query_args[] = $args['limit'];
+        $query_args[] = $args['offset'];
+        
+        // Prepara la query con tutti i parametri
+        $prepared_query = $wpdb->prepare($query, $query_args);
+        
+        // Esegui la query
+        $results = $wpdb->get_results($prepared_query);
+        
+        return $results;
     }
     
     /**
-     * Registra un'azione nel log audit
+     * Inserisce un nuovo team nel database
      *
-     * @param string $action Tipo di azione
-     * @param string $object_type Tipo di oggetto
-     * @param int $object_id ID dell'oggetto
-     * @param array $details Dettagli dell'azione
-     * @param int $user_id ID dell'utente
-     * @return int|false ID del log inserito o false in caso di errore
+     * @param array $data Dati del team
+     * @return int|false ID del team inserito o false in caso di errore
      */
-    public function log_action($action, $object_type, $object_id, $details = [], $user_id = null) {
+    public function insert_team($data) {
         global $wpdb;
         
-        if ($user_id === null) {
-            $user_id = get_current_user_id();
+        // Verifica i dati obbligatori
+        if (empty($data['name']) || empty($data['game']) || empty($data['captain_id'])) {
+            return false;
         }
         
-        $table = $this->db_manager->get_table_name('audit_logs');
-        
-        $log_data = [
-            'user_id' => $user_id,
-            'action' => sanitize_text_field($action),
-            'object_type' => sanitize_text_field($object_type),
-            'object_id' => absint($object_id),
-            'details' => json_encode($details),
-            'ip_address' => $this->get_client_ip(),
+        // Sanitizzazione
+        $team_data = [
+            'name' => sanitize_text_field($data['name']),
+            'description' => isset($data['description']) ? wp_kses_post($data['description']) : '',
+            'game' => sanitize_text_field($data['game']),
+            'logo_url' => isset($data['logo_url']) ? esc_url_raw($data['logo_url']) : '',
+            'captain_id' => absint($data['captain_id']),
+            'email' => isset($data['email']) ? sanitize_email($data['email']) : '',
+            'website' => isset($data['website']) ? esc_url_raw($data['website']) : '',
+            'social_media' => isset($data['social_media']) ? json_encode($data['social_media']) : '{}',
+            'created_by' => isset($data['created_by']) ? absint($data['created_by']) : get_current_user_id(),
             'created_at' => current_time('mysql')
         ];
         
+        // Genera uno slug univoco
+        $table = $this->get_table_name('teams');
+        $team_data['slug'] = eto_generate_unique_slug($team_data['name'], $table);
+        
+        // Inserisci il team
         $result = $wpdb->insert(
             $table,
-            $log_data,
+            $team_data,
             [
-                '%d', // user_id
-                '%s', // action
-                '%s', // object_type
-                '%d', // object_id
-                '%s', // details
-                '%s', // ip_address
+                '%s', // name
+                '%s', // slug
+                '%s', // description
+                '%s', // game
+                '%s', // logo_url
+                '%d', // captain_id
+                '%s', // email
+                '%s', // website
+                '%s', // social_media
+                '%d', // created_by
                 '%s'  // created_at
             ]
         );
         
         if ($result === false) {
             if (defined('ETO_DEBUG') && ETO_DEBUG) {
-                error_log('[ETO] Errore inserimento log audit: ' . $wpdb->last_error);
+                error_log('[ETO] Errore inserimento team: ' . $wpdb->last_error);
             }
             return false;
         }
         
-        return $wpdb->insert_id;
+        $team_id = $wpdb->insert_id;
+        
+        // Registra l'azione nel log audit
+        $this->log_action(
+            'create',
+            'team',
+            $team_id,
+            [
+                'name' => $team_data['name'],
+                'game' => $team_data['game']
+            ],
+            $team_data['created_by']
+        );
+        
+        return $team_id;
     }
     
     /**
-     * Ottiene l'indirizzo IP del client
+     * Aggiorna un team esistente
      *
-     * @return string Indirizzo IP
+     * @param int $team_id ID del team
+     * @param array $data Dati da aggiornare
+     * @return bool True se l'aggiornamento è riuscito, false altrimenti
      */
-    private function get_client_ip() {
-        $ip = '';
+    public function update_team($team_id, $data) {
+        global $wpdb;
         
-        // Proxy trusted
-        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ip = sanitize_text_field($_SERVER['HTTP_X_FORWARDED_FOR']);
-        } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
-            $ip = sanitize_text_field($_SERVER['REMOTE_ADDR']);
+        $team_id = absint($team_id);
+        if ($team_id <= 0 || empty($data)) {
+            return false;
         }
         
-        // Validazione IP
-        $ip = filter_var($ip, FILTER_VALIDATE_IP);
+        $table = $this->get_table_name('teams');
         
-        return $ip ?: '';
+        // Campi aggiornabili e relativi formati
+        $allowed_fields = [
+            'name' => '%s',
+            'description' => '%s',
+            'game' => '%s',
+            'logo_url' => '%s',
+            'captain_id' => '%d',
+            'email' => '%s',
+            'website' => '%s',
+            'social_media' => '%s',
+            'updated_at' => '%s'
+        ];
+        
+        $update_data = [];
+        $formats = [];
+        
+        // Prepara i dati da aggiornare
+        foreach ($allowed_fields as $field => $format) {
+            if (isset($data[$field])) {
+                $update_data[$field] = $data[$field];
+                $formats[] = $format;
+            }
+        }
+        
+        // Aggiorna lo slug se il nome è cambiato
+        if (isset($update_data['name'])) {
+            $update_data['slug'] = eto_generate_unique_slug($update_data['name'], $table, $team_id);
+            $formats[] = '%s';
+        }
+        
+        // Aggiungi la data di aggiornamento
+        if (!isset($update_data['updated_at'])) {
+            $update_data['updated_at'] = current_time('mysql');
+            $formats[] = '%s';
+        }
+        
+        // Aggiorna il team
+        $result = $wpdb->update(
+            $table,
+            $update_data,
+            ['id' => $team_id],
+            $formats,
+            ['%d']
+        );
+        
+        if ($result === false) {
+            if (defined('ETO_DEBUG') && ETO_DEBUG) {
+                error_log('[ETO] Errore aggiornamento team: ' . $wpdb->last_error);
+            }
+            return false;
+        }
+        
+        // Registra l'azione nel log audit
+        $this->log_action(
+            'update',
+            'team',
+            $team_id,
+            $update_data,
+            get_current_user_id()
+        );
+        
+        return true;
+    }
+    
+    /**
+     * Elimina un team
+     *
+     * @param int $team_id ID del team
+     * @return bool True se l'eliminazione è riuscita, false altrimenti
+     */
+    public function delete_team($team_id) {
+        global $wpdb;
+        
+        $team_id = absint($team_id);
+        if ($team_id <= 0) {
+            return false;
+        }
+        
+        $table = $this->get_table_name('teams');
+        
+        // Elimina il team
+        $result = $wpdb->delete(
+            $table,
+            ['id' => $team_id],
+            ['%d']
+        );
+        
+        if ($result === false) {
+            if (defined('ETO_DEBUG') && ETO_DEBUG) {
+                error_log('[ETO] Errore eliminazione team: ' . $wpdb->last_error);
+            }
+            return false;
+        }
+        
+        // Registra l'azione nel log audit
+        $this->log_action(
+            'delete',
+            'team',
+            $team_id,
+            [],
+            get_current_user_id()
+        );
+        
+        return true;
+    }
+    
+    /**
+     * Registra un'azione nel log audit
+     *
+     * @param string $action Azione eseguita
+     * @param string $object_type Tipo di oggetto
+     * @param int $object_id ID dell'oggetto
+     * @param array $data Dati aggiuntivi
+     * @param int $user_id ID dell'utente
+     * @return bool True se il log è stato registrato, false altrimenti
+     */
+    public function log_action($action, $object_type, $object_id, $data = [], $user_id = 0) {
+        global $wpdb;
+        
+        if (empty($user_id)) {
+            $user_id = get_current_user_id();
+        }
+        
+        $table = $this->get_table_name('logs');
+        
+        $result = $wpdb->insert(
+            $table,
+            [
+                'action' => $action,
+                'object_type' => $object_type,
+                'object_id' => $object_id,
+                'data' => json_encode($data),
+                'user_id' => $user_id,
+                'created_at' => current_time('mysql')
+            ],
+            [
+                '%s', // action
+                '%s', // object_type
+                '%d', // object_id
+                '%s', // data
+                '%d', // user_id
+                '%s'  // created_at
+            ]
+        );
+        
+        return $result !== false;
     }
 }
